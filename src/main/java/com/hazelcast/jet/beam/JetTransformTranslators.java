@@ -74,7 +74,7 @@ class JetTransformTranslators {
                     throw new RuntimeException(e);
                 }
 
-                PCollection<T> output = Utils.getOutput(appliedTransform);
+                Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
 
                 String transformName = appliedTransform.getFullName();
                 SerializablePipelineOptions pipelineOptions = context.getOptions();
@@ -84,7 +84,9 @@ class JetTransformTranslators {
                 String vertexId = dagBuilder.newVertexId(transformName);
                 Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
-                dagBuilder.registerEdgeStartPoint(Utils.getTupleTag(output), vertex);
+                TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
+                dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+                dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
             } else {
                 throw new UnsupportedOperationException(); //todo
             }
@@ -117,7 +119,6 @@ class JetTransformTranslators {
                 throw new RuntimeException(e);
             }
             Map<TupleTag<?>, Integer> outputMap = new HashMap<>();
-            // put the main output at index 0, FlinkMultiOutputDoFnFunction  expects this
             outputMap.put(mainOutputTag, 0);
             int count = 1;
             for (TupleTag<?> tag : outputs.keySet()) {
@@ -176,9 +177,7 @@ class JetTransformTranslators {
                     vertexId,
                     doFn,
                     windowingStrategy[0],
-                    outputMap,
-                    pipelineOptions,
-                    mainOutputTag,
+                    pipelineOptions, mainOutputTag, outputMap.keySet(),
                     coder,
                     outputCoderMap,
                     sideInputs
@@ -198,8 +197,11 @@ class JetTransformTranslators {
                 }
             }
 
-            for (PValue value : outputs.values()) {
-                dagBuilder.registerEdgeStartPoint(Utils.getTupleTag(value), vertex);
+            for (Map.Entry<TupleTag<?>, PValue> entry : outputs.entrySet()) {
+                TupleTag<?> pCollId = entry.getKey();
+                TupleTag<?> edgeId = Utils.getTupleTag(entry.getValue());
+                dagBuilder.registerCollectionOfEdge(edgeId, pCollId);
+                dagBuilder.registerEdgeStartPoint(edgeId, vertex);
             }
 
         }
@@ -239,8 +241,10 @@ class JetTransformTranslators {
                 PCollection<KV<K, InputT>> input = Utils.getInput(appliedTransform);
                 dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
-                PCollection<KV<K, Iterable<InputT>>> output = Utils.getOutput(appliedTransform);
-                dagBuilder.registerEdgeStartPoint(Utils.getTupleTag(output), vertex);
+                Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+                TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
+                dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+                dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
             } else {
                 throw new UnsupportedOperationException(); //todo
             }
@@ -271,11 +275,14 @@ class JetTransformTranslators {
             PCollection<T> input = Utils.getInput(appliedTransform);
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
-            PCollection<T> output = Utils.getOutput(appliedTransform);
-            dagBuilder.registerEdgeStartPoint(Utils.getTupleTag(output), vertex);
-
             TupleTag<?> viewTag = Utils.getTupleTag(view);
+            dagBuilder.registerCollectionOfEdge(viewTag, view.getTagInternal()); //todo (NEXT): getTagInternal() is just something I picked at random!
             dagBuilder.registerEdgeStartPoint(viewTag, vertex); //todo: view out edges should most likely be of broadcast type
+
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
         }
     }
 
@@ -300,8 +307,10 @@ class JetTransformTranslators {
                 }
             }
 
-            PCollection<T> output = Utils.getOutput(appliedTransform);
-            dagBuilder.registerEdgeStartPoint(Utils.getTupleTag(output), vertex);
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
         }
     }
 
@@ -311,7 +320,7 @@ class JetTransformTranslators {
             AppliedPTransform<PCollection<T>, PCollection<T>, PTransform<PCollection<T>, PCollection<T>>> appliedTransform =
                     (AppliedPTransform<PCollection<T>, PCollection<T>, PTransform<PCollection<T>, PCollection<T>>>) node.toAppliedPTransform(pipeline);
             WindowingStrategy<T, ? extends BoundedWindow> windowingStrategy =
-                    (WindowingStrategy<T, ? extends BoundedWindow>) Utils.<PCollection<T>>getOutput(appliedTransform).getWindowingStrategy();
+                    (WindowingStrategy<T, ? extends BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
             WindowFn<T, ? extends BoundedWindow> windowFn = windowingStrategy.getWindowFn();
 
             DistributedSupplier<Processor> processorSupplier = Processors.flatMapP(
@@ -333,8 +342,10 @@ class JetTransformTranslators {
             PCollection<WindowedValue> input = Utils.getInput(appliedTransform);
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
-            PCollection<WindowedValue> output = Utils.getOutput(appliedTransform);
-            dagBuilder.registerEdgeStartPoint(Utils.getTupleTag(output), vertex);
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
         }
 
         private static class WindowAssignContext<InputT, W extends BoundedWindow> extends WindowFn<InputT, W>.AssignContext {

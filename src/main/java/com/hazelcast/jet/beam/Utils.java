@@ -47,12 +47,12 @@ public class Utils {
         return appliedTransform.getOutputs();
     }
 
-    static <T extends PValue> T getOutput(AppliedPTransform<?, ?, ?> appliedTransform) {
-        return (T) Iterables.getOnlyElement(getOutputs(appliedTransform).values());
+    static Map.Entry<TupleTag<?>, PValue> getOutput(AppliedPTransform<?, ?, ?> appliedTransform) {
+        return Iterables.getOnlyElement(getOutputs(appliedTransform).entrySet());
     }
 
     static <T> boolean isBounded(AppliedPTransform<?, ?, ?> appliedTransform) {
-        return ((PCollection) getOutput(appliedTransform)).isBounded().equals(PCollection.IsBounded.BOUNDED);
+        return ((PCollection) getOutput(appliedTransform).getValue()).isBounded().equals(PCollection.IsBounded.BOUNDED);
     }
 
     static Map<TupleTag<?>, Coder<?>> getOutputCoders(AppliedPTransform<?, ?, ?> appliedTransform) {

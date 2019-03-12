@@ -12,6 +12,7 @@ public class DAGBuilder {
 
     private final Map<TupleTag, Vertex> edgeStartPoints = new HashMap<>();
     private final Map<TupleTag, Set<Vertex>> edgeEndPoints = new HashMap<>();
+    private final Map<TupleTag, TupleTag> pCollsOfEdges = new HashMap<>();
 
     private final List<WiringListener> listeners = new ArrayList<>();
 
@@ -27,17 +28,22 @@ public class DAGBuilder {
     }
 
     String newVertexId(String transformName) {
-        return Integer.toString(vertexId++) + " (" + transformName + ")";
+        return vertexId++ + " (" + transformName + ")";
     }
 
-    void registerEdgeStartPoint(TupleTag<?> tupleTag, Vertex vertex) {
-        Vertex prevValue = edgeStartPoints.put(tupleTag, vertex);
-        if (prevValue != null) throw new RuntimeException("Oops!");
+    void registerCollectionOfEdge(TupleTag<?> edgeId, TupleTag pCollId) {
+        TupleTag prevPCollId = pCollsOfEdges.put(edgeId, pCollId);
+        if (prevPCollId != null) throw new RuntimeException("Oops!");
     }
 
-    void registerEdgeEndPoint(TupleTag<?> tupleTag, Vertex vertex) {
+    void registerEdgeStartPoint(TupleTag<?> edgeId, Vertex vertex) {
+        Vertex prevVertex = edgeStartPoints.put(edgeId, vertex);
+        if (prevVertex != null) throw new RuntimeException("Oops!");
+    }
+
+    void registerEdgeEndPoint(TupleTag<?> edgeId, Vertex vertex) {
         edgeEndPoints.compute(
-                tupleTag,
+                edgeId,
                 (v, oldPoints) -> {
                     if (oldPoints == null) return Collections.singleton(vertex);
 
@@ -75,20 +81,23 @@ public class DAGBuilder {
             edgeIds.addAll(edgeEndPoints.keySet());
 
             for (TupleTag edgeId : edgeIds) {
-                boolean highPriorityEdge = edgeId.toString().contains("PCollectionView"); //todo: this is a hack!
+                TupleTag pCollId = pCollsOfEdges.get(edgeId);
+                if (pCollId == null) throw new RuntimeException("Oops!");
+
                 Vertex sourceVertex = edgeStartPoints.get(edgeId);
-                if (sourceVertex == null) continue;
+                if (sourceVertex == null) throw new RuntimeException("Oops!");
 
                 Set<Vertex> destinationVertices = edgeEndPoints.get(edgeId);
                 if (destinationVertices == null || destinationVertices.isEmpty()) continue;
 
+                boolean highPriorityEdge = edgeId.toString().contains("PCollectionView"); //todo: this is a hack!
                 for (Vertex destinationVertex : destinationVertices) {
-                    addEdge(sourceVertex, destinationVertex, highPriorityEdge);
+                    addEdge(sourceVertex, destinationVertex, pCollId, highPriorityEdge);
                 }
             }
         }
 
-        private void addEdge(Vertex sourceVertex, Vertex destinationVertex, boolean highPriority) {
+        private void addEdge(Vertex sourceVertex, Vertex destinationVertex, TupleTag pCollId, boolean highPriority) {
             //todo: set up the edges properly, including other aspects too, like parallelism
 
             try {
@@ -100,8 +109,8 @@ public class DAGBuilder {
                 String sourceVertexName = sourceVertex.getName();
                 String destinationVertexName = destinationVertex.getName();
                 for (WiringListener listener : listeners) {
-                    listener.isInboundEdgeOfVertex(edge, sourceVertexName);
-                    listener.isOutboundEdgeOfVerted(edge, destinationVertexName);
+                    listener.isInboundEdgeOfVertex(edge, pCollId, destinationVertexName);
+                    listener.isOutboundEdgeOfVertex(edge, pCollId, sourceVertexName);
                 }
             } catch (Exception e) {
                 e.printStackTrace(); //todo: what more to do with the error
@@ -120,9 +129,9 @@ public class DAGBuilder {
 
     public interface WiringListener {
 
-        void isOutboundEdgeOfVerted(Edge edge, String vertexId);
+        void isOutboundEdgeOfVertex(Edge edge, TupleTag pCollId, String vertexId);
 
-        void isInboundEdgeOfVertex(Edge edge, String vertexId);
+        void isInboundEdgeOfVertex(Edge edge, TupleTag pCollId, String vertexId);
     }
 
 }

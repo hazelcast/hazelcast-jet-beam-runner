@@ -12,19 +12,20 @@ import org.junit.runners.JUnit4;
 import java.util.Arrays;
 
 @RunWith(JUnit4.class)
+/* "Inspired" by org.apache.beam.examples.WordCountTest */
 public class WordCountTest extends AbstractRunnerTest {
 
     @Test
     public void testCountWords() {
         String[] lines = {"hi there", "hi", "hi sue bob", "hi sue", "", "bob hi"};
-        PCollection<String> input = p.apply(Create.of(Arrays.asList(lines)).withCoder(StringUtf8Coder.of()));
+        PCollection<String> input = pipeline.apply(Create.of(Arrays.asList(lines)).withCoder(StringUtf8Coder.of()));
 
         PCollection<String> output = input
                 .apply(new CountWords())
                 .apply(MapElements.via(new FormatKVAsTextFn()));
 
         PAssert.that(output).containsInAnyOrder("hi: 5", "there: 1", "sue: 2", "bob: 2");
-        p.run().waitUntilFinish();
+        pipeline.run().waitUntilFinish();
     }
 
     static class ExtractWordsFn extends DoFn<String, String> {

@@ -53,9 +53,9 @@ public class JetRunner extends PipelineRunner<JetPipelineResult> {
     }
 
     private DAG translate(Pipeline pipeline) {
-        PrintGraphVisitor printVisitor = new PrintGraphVisitor();
+        /*PrintGraphVisitor printVisitor = new PrintGraphVisitor();
         pipeline.traverseTopologically(printVisitor);
-        System.out.println("Beam pipeline:" + printVisitor.print()); //todo: remove
+        System.out.println("Beam pipeline:" + printVisitor.print()); //todo: remove*/
 
         /*PrintFullGraphVisitor printFullVisitor = new PrintFullGraphVisitor();
         pipeline.traverseTopologically(printFullVisitor);

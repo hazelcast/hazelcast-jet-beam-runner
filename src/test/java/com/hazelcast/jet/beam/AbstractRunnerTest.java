@@ -17,7 +17,7 @@ public abstract class AbstractRunnerTest {
     public Timeout globalTimeout = Timeout.seconds(10); // 10 seconds max per method tested
 
     @Rule
-    public TestPipeline p = getTestPipeline();
+    public TestPipeline pipeline = getTestPipeline();
 
     private static TestPipeline getTestPipeline() {
         System.setProperty(
