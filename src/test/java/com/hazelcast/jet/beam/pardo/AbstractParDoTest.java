@@ -23,7 +23,6 @@ import static org.junit.Assert.assertThat;
 
 abstract class AbstractParDoTest extends AbstractRunnerTest implements Serializable {
 
-
     /** A {@link PipelineOptions} subclass for testing passing to a {@link DoFn}. */
     public interface MyOptions extends PipelineOptions {
         @Default.String("fake option")

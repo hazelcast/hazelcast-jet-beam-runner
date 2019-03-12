@@ -6,12 +6,9 @@ import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
 import java.util.Arrays;
 
-@RunWith(JUnit4.class)
 /* "Inspired" by org.apache.beam.examples.WordCountTest */
 public class WordCountTest extends AbstractRunnerTest {
 

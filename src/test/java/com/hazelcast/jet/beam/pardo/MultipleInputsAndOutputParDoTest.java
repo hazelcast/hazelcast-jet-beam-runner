@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+/* "Inspired" by org.apache.beam.sdk.transforms.ParDoTest.MultipleInputsAndOutputTests */
 public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
 
     @Test

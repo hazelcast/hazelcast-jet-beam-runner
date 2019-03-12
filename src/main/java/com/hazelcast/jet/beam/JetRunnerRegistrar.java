@@ -22,7 +22,7 @@ public final class JetRunnerRegistrar {
     public static class Runner implements PipelineRunnerRegistrar {
         @Override
         public Iterable<Class<? extends PipelineRunner<?>>> getPipelineRunners() {
-            return ImmutableList.of(JetRunner.class);
+            return ImmutableList.of(JetRunner.class, TestJetRunner.class);
         }
     }
 

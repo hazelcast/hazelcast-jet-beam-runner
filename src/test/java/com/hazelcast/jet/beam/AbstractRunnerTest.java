@@ -1,16 +1,21 @@
 package com.hazelcast.jet.beam;
 
-import com.hazelcast.jet.Jet;
+import com.hazelcast.config.EventJournalConfig;
+import com.hazelcast.jet.JetInstance;
+import com.hazelcast.jet.JetTestInstanceFactory;
 import com.hazelcast.jet.config.JetConfig;
+import com.hazelcast.test.HazelcastParallelClassRunner;
 import org.apache.beam.sdk.testing.TestPipeline;
 import org.apache.beam.sdk.transforms.SimpleFunction;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.vendor.grpc.v1p13p1.com.google.gson.GsonBuilder;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
 
+@RunWith(HazelcastParallelClassRunner.class)
 public abstract class AbstractRunnerTest {
 
     @Rule
@@ -24,7 +29,7 @@ public abstract class AbstractRunnerTest {
                 TestPipeline.PROPERTY_BEAM_TEST_PIPELINE_OPTIONS,
                 new GsonBuilder().create().toJson(
                         new String[]{
-                                "--runner=JetRunner",
+                                "--runner=TestJetRunner",
                                 "--jetGroupName=" + JetConfig.DEFAULT_GROUP_NAME,
                                 "--jetGroupPassword=" + JetConfig.DEFAULT_GROUP_PASSWORD
                         }
@@ -33,17 +38,24 @@ public abstract class AbstractRunnerTest {
         return TestPipeline.create();
     }
 
-    @Before
-    public void before() {
-        JetConfig config = new JetConfig();
-        config.getHazelcastConfig().setProperty("hazelcast.logging.type", "log4j");
-
-        Jet.newJetInstance(config);
+    private static JetTestInstanceFactory factory = new JetTestInstanceFactory();
+    static {
+        TestJetRunner.JET_CLIENT_SUPPLIER = factory::newClient;
     }
 
-    @After
-    public void after() {
-        Jet.shutdownAll();
+    private static JetInstance instance;
+
+    @BeforeClass
+    public static void beforeClass() {
+        JetConfig config = new JetConfig();
+        config.getHazelcastConfig().setProperty("hazelcast.logging.type", "log4j");
+        config.getHazelcastConfig().addEventJournalConfig(new EventJournalConfig().setMapName("map"));
+        instance = factory.newMember(config);
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        factory.shutdownAll();
     }
 
     protected static class FormatLongAsTextFn extends SimpleFunction<Long, String> {
