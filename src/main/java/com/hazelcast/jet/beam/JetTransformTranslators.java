@@ -23,6 +23,7 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
+import org.apache.beam.sdk.transforms.windowing.PaneInfo;
 import org.apache.beam.sdk.transforms.windowing.WindowFn;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.*;
@@ -33,7 +34,6 @@ import org.joda.time.Instant;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static org.apache.beam.vendor.guava.v20_0.com.google.common.base.Preconditions.checkState;
 
@@ -223,15 +223,21 @@ class JetTransformTranslators {
                         AggregateOperations.toList(),
                         (DistributedBiFunction<K, List<WindowedValue<KV<K, InputT>>>, WindowedValue<KV<K, Iterable<InputT>>>>)
                                 (k, windowedValues) ->
-                                        WindowedValue.valueInGlobalWindow( //todo: this will definitely not work for unbounded streams...
-                                                KV.of(
-                                                        k,
-                                                        windowedValues.stream()
-                                                                .map(WindowedValue::getValue)
-                                                                .map(KV::getValue)
-                                                                .collect(Collectors.toList())
-                                                )
-                                        )
+                                {
+                                    //todo: can windowedValues be empty?
+                                    Instant instant = null;
+                                    BoundedWindow window = null;
+                                    PaneInfo pane = null;
+                                    List<InputT> values = new ArrayList<>();
+                                    for (WindowedValue<KV<K, InputT>> windowedValue : windowedValues) {
+                                        if (window == null) window = windowedValue.getWindows().iterator().next();
+                                        if (pane == null) pane = windowedValue.getPane();
+                                        if (instant == null) instant = windowedValue.getTimestamp();
+                                        values.add(windowedValue.getValue().getValue());
+                                    }
+                                    //todo: not sure if it's ok to just pick a random value for window/pane/instant...
+                                    return WindowedValue.of(KV.<K, Iterable<InputT>>of(k, values), Instant.now(), window, pane);
+                                }
                 );
 
                 DAGBuilder dagBuilder = context.getDagBuilder();
@@ -326,7 +332,13 @@ class JetTransformTranslators {
             DistributedSupplier<Processor> processorSupplier = Processors.flatMapP(
                     (DistributedFunction<Object, Traverser<?>>) o -> {
                         WindowedValue input = (WindowedValue) o;
-                        Collection<? extends BoundedWindow> windows = windowFn.assignWindows(new WindowAssignContext<>(windowFn, input)); //todo: tons of garbage!
+                        Collection<? extends BoundedWindow> windows = null; //todo: tons of garbage!
+                        try {
+                            windows = windowFn.assignWindows(new WindowAssignContext<>(windowFn, input));
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            throw e;
+                        }
 
                         return Traversers.traverseStream(
                                 windows.stream().map(window -> WindowedValue.of(input.getValue(), input.getTimestamp(), window, input.getPane()))

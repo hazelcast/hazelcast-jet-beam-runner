@@ -179,4 +179,17 @@ abstract class AbstractParDoTest extends AbstractRunnerTest implements Serializa
             FINISHED
         }
     }
+
+    static class FnWithSideInputs extends DoFn<String, String> {
+        private final PCollectionView<Integer> view;
+
+        FnWithSideInputs(PCollectionView<Integer> view) {
+            this.view = view;
+        }
+
+        @ProcessElement
+        public void processElement(ProcessContext c, @Element String element) {
+            c.output(element + ":" + c.sideInput(view));
+        }
+    }
 }
