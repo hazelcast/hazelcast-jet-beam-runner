@@ -2,15 +2,14 @@ package com.hazelcast.jet.beam;
 
 import com.hazelcast.jet.Traverser;
 import com.hazelcast.jet.Traversers;
-import com.hazelcast.jet.aggregate.AggregateOperations;
 import com.hazelcast.jet.beam.processors.BoundedSourceProcessorSupplier;
 import com.hazelcast.jet.beam.processors.CreateViewProcessor;
+import com.hazelcast.jet.beam.processors.GroupByKeyProcessorSupplier;
 import com.hazelcast.jet.beam.processors.ParDoProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.Vertex;
 import com.hazelcast.jet.core.processor.Processors;
-import com.hazelcast.jet.function.DistributedBiFunction;
 import com.hazelcast.jet.function.DistributedFunction;
 import com.hazelcast.jet.function.DistributedSupplier;
 import org.apache.beam.runners.core.construction.*;
@@ -23,7 +22,7 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
-import org.apache.beam.sdk.transforms.windowing.PaneInfo;
+import org.apache.beam.sdk.transforms.windowing.TimestampCombiner;
 import org.apache.beam.sdk.transforms.windowing.WindowFn;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.*;
@@ -33,7 +32,10 @@ import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Maps;
 import org.joda.time.Instant;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.apache.beam.vendor.guava.v20_0.com.google.common.base.Preconditions.checkState;
 
@@ -164,7 +166,7 @@ class JetTransformTranslators {
             Map<TupleTag<?>, Coder<?>> outputCoderMap = Utils.getOutputCoders(appliedTransform);
 
             if (usesStateOrTimers) {
-                throw new UnsupportedOperationException(); //todo
+                throw new UnsupportedOperationException(); //todo: implement
             }
 
             String transformName = appliedTransform.getFullName();
@@ -216,38 +218,18 @@ class JetTransformTranslators {
                     (AppliedPTransform<PCollection<K>, PCollection<InputT>, PTransform<PCollection<K>, PCollection<InputT>>>) node.toAppliedPTransform(pipeline);
             if (Utils.isBounded(appliedTransform)) {
                 String transformName = appliedTransform.getFullName();
-                DistributedFunction<WindowedValue<KV<K, InputT>>, K> keyExtractorFunction =
-                        (DistributedFunction<WindowedValue<KV<K, InputT>>, K>) windowedKeyValuePair -> windowedKeyValuePair.getValue().getKey();
-                DistributedSupplier<Processor> processorSupplier = Processors.aggregateByKeyP(
-                        Collections.singletonList(keyExtractorFunction),
-                        AggregateOperations.toList(),
-                        (DistributedBiFunction<K, List<WindowedValue<KV<K, InputT>>>, WindowedValue<KV<K, Iterable<InputT>>>>)
-                                (k, windowedValues) ->
-                                {
-                                    //todo: can windowedValues be empty?
-                                    Instant instant = null;
-                                    BoundedWindow window = null;
-                                    PaneInfo pane = null;
-                                    List<InputT> values = new ArrayList<>();
-                                    for (WindowedValue<KV<K, InputT>> windowedValue : windowedValues) {
-                                        if (window == null) window = windowedValue.getWindows().iterator().next();
-                                        if (pane == null) pane = windowedValue.getPane();
-                                        if (instant == null) instant = windowedValue.getTimestamp();
-                                        values.add(windowedValue.getValue().getValue());
-                                    }
-                                    //todo: not sure if it's ok to just pick a random value for window/pane/instant...
-                                    return WindowedValue.of(KV.<K, Iterable<InputT>>of(k, values), Instant.now(), window, pane);
-                                }
-                );
+
+                PCollection<KV<K, InputT>> input = Utils.getInput(appliedTransform);
+                TimestampCombiner timestampCombiner = input.getWindowingStrategy().getTimestampCombiner();
+
+                Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
 
                 DAGBuilder dagBuilder = context.getDagBuilder();
                 String vertexId = dagBuilder.newVertexId(transformName);
-                Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
+                Vertex vertex = dagBuilder.addVertex(vertexId, new GroupByKeyProcessorSupplier<>(timestampCombiner));
 
-                PCollection<KV<K, InputT>> input = Utils.getInput(appliedTransform);
                 dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
-                Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
                 TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
                 dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
                 dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
@@ -255,6 +237,8 @@ class JetTransformTranslators {
                 throw new UnsupportedOperationException(); //todo
             }
         }
+
+
 
     }
 

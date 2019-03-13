@@ -1,6 +1,9 @@
 package com.hazelcast.jet.beam.pardo;
 
 import com.hazelcast.jet.beam.AbstractRunnerTest;
+import org.apache.beam.sdk.coders.AtomicCoder;
+import org.apache.beam.sdk.coders.CoderException;
+import org.apache.beam.sdk.coders.VarIntCoder;
 import org.apache.beam.sdk.options.Default;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -9,7 +12,12 @@ import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.GlobalWindow;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
+import org.junit.Rule;
+import org.junit.rules.ExpectedException;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,7 +29,11 @@ import static org.hamcrest.collection.IsIterableContainingInAnyOrder.containsInA
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
-abstract class AbstractParDoTest extends AbstractRunnerTest implements Serializable {
+@SuppressWarnings("ALL")
+public abstract class AbstractParDoTest extends AbstractRunnerTest implements Serializable {
+
+    @Rule
+    public transient ExpectedException thrown = ExpectedException.none();
 
     /** A {@link PipelineOptions} subclass for testing passing to a {@link DoFn}. */
     public interface MyOptions extends PipelineOptions {
@@ -189,6 +201,68 @@ abstract class AbstractParDoTest extends AbstractRunnerTest implements Serializa
         @ProcessElement
         public void processElement(ProcessContext c, @Element String element) {
             c.output(element + ":" + c.sideInput(view));
+        }
+    }
+
+    static class MyIntegerCoder extends AtomicCoder<MyInteger> {
+        private static final MyIntegerCoder INSTANCE = new MyIntegerCoder();
+
+        private final VarIntCoder delegate = VarIntCoder.of();
+
+        public static MyIntegerCoder of() {
+            return INSTANCE;
+        }
+
+        @Override
+        public void encode(MyInteger value, OutputStream outStream) throws CoderException, IOException {
+            delegate.encode(value.getValue(), outStream);
+        }
+
+        @Override
+        public MyInteger decode(InputStream inStream) throws CoderException, IOException {
+            return new MyInteger(delegate.decode(inStream));
+        }
+    }
+
+    static class MyInteger implements Comparable<MyInteger> {
+        private final int value;
+
+        MyInteger(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+
+            if (!(o instanceof MyInteger)) {
+                return false;
+            }
+
+            MyInteger myInteger = (MyInteger) o;
+
+            return value == myInteger.value;
+        }
+
+        @Override
+        public int hashCode() {
+            return value;
+        }
+
+        @Override
+        public int compareTo(MyInteger o) {
+            return Integer.compare(this.getValue(), o.getValue());
+        }
+
+        @Override
+        public String toString() {
+            return "MyInteger{" + "value=" + value + '}';
         }
     }
 }
