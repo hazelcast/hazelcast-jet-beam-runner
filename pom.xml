@@ -20,7 +20,7 @@
         <dependency>
             <groupId>com.hazelcast.jet</groupId>
             <artifactId>hazelcast-jet-core</artifactId>
-            <version>0.7.2</version>
+            <version>3.0-SNAPSHOT</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.apache.beam/beam-runners-core-java -->
@@ -41,7 +41,7 @@
         <dependency>
             <groupId>com.hazelcast.jet</groupId>
             <artifactId>hazelcast-jet-core</artifactId>
-            <version>0.7.2</version>
+            <version>3.0-SNAPSHOT</version>
             <classifier>tests</classifier>
             <scope>test</scope>
         </dependency>
@@ -49,7 +49,7 @@
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast</artifactId>
-            <version>3.10.5</version>
+            <version>3.12-SNAPSHOT</version>
             <classifier>tests</classifier>
             <scope>test</scope>
         </dependency>
@@ -57,7 +57,7 @@
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast-client</artifactId>
-            <version>3.10.5</version>
+            <version>3.12-SNAPSHOT</version>
             <classifier>tests</classifier>
             <scope>test</scope>
         </dependency>

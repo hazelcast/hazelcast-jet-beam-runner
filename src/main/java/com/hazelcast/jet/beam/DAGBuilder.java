@@ -1,10 +1,21 @@
 package com.hazelcast.jet.beam;
 
-import com.hazelcast.jet.core.*;
-import com.hazelcast.jet.function.DistributedSupplier;
+import com.hazelcast.jet.core.DAG;
+import com.hazelcast.jet.core.Edge;
+import com.hazelcast.jet.core.Processor;
+import com.hazelcast.jet.core.ProcessorMetaSupplier;
+import com.hazelcast.jet.core.Vertex;
+import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.values.TupleTag;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class DAGBuilder {
 
@@ -59,7 +70,7 @@ public class DAGBuilder {
         return dag.newVertex(id, processorMetaSupplier);
     }
 
-    Vertex addVertex(String id, DistributedSupplier<Processor> processor) {
+    Vertex addVertex(String id, SupplierEx<Processor> processor) {
         return dag
                 .newVertex(id, processor)
                 .localParallelism(1) //todo: quick and dirty hack for now, can't leave it like this

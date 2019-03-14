@@ -2,8 +2,12 @@ package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
 import com.hazelcast.jet.beam.Utils;
-import com.hazelcast.jet.core.*;
-import com.hazelcast.jet.function.DistributedConsumer;
+import com.hazelcast.jet.core.AbstractProcessor;
+import com.hazelcast.jet.core.Inbox;
+import com.hazelcast.jet.core.Processor;
+import com.hazelcast.jet.core.ProcessorMetaSupplier;
+import com.hazelcast.jet.core.ProcessorSupplier;
+import com.hazelcast.jet.function.ConsumerEx;
 import com.hazelcast.nio.Address;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.io.BoundedSource;
@@ -121,12 +125,12 @@ public class BoundedSourceProcessorSupplier implements ProcessorMetaSupplier {
     private static class NoopP implements Processor { //todo: is in Processors, but it's private
         @Override
         public void process(int ordinal, Inbox inbox) {
-            inbox.drain(DistributedConsumer.noop());
+            inbox.drain(ConsumerEx.noop());
         }
 
         @Override
         public void restoreFromSnapshot(Inbox inbox) {
-            inbox.drain(DistributedConsumer.noop());
+            inbox.drain(ConsumerEx.noop());
         }
     }
 

@@ -31,7 +31,7 @@ public abstract class AbstractRunnerTest {
                         new String[]{
                                 "--runner=TestJetRunner",
                                 "--jetGroupName=" + JetConfig.DEFAULT_GROUP_NAME,
-                                "--jetGroupPassword=" + JetConfig.DEFAULT_GROUP_PASSWORD
+                                "--jetGroupPassword="
                         }
                 )
         );

@@ -10,9 +10,13 @@ import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.Vertex;
 import com.hazelcast.jet.core.processor.Processors;
-import com.hazelcast.jet.function.DistributedFunction;
-import com.hazelcast.jet.function.DistributedSupplier;
-import org.apache.beam.runners.core.construction.*;
+import com.hazelcast.jet.function.FunctionEx;
+import com.hazelcast.jet.function.SupplierEx;
+import org.apache.beam.runners.core.construction.CreatePCollectionViewTranslation;
+import org.apache.beam.runners.core.construction.PTransformTranslation;
+import org.apache.beam.runners.core.construction.ParDoTranslation;
+import org.apache.beam.runners.core.construction.ReadTranslation;
+import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.io.BoundedSource;
@@ -22,10 +26,17 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
-import org.apache.beam.sdk.transforms.windowing.TimestampCombiner;
 import org.apache.beam.sdk.transforms.windowing.WindowFn;
 import org.apache.beam.sdk.util.WindowedValue;
-import org.apache.beam.sdk.values.*;
+import org.apache.beam.sdk.values.KV;
+import org.apache.beam.sdk.values.PBegin;
+import org.apache.beam.sdk.values.PCollection;
+import org.apache.beam.sdk.values.PCollectionList;
+import org.apache.beam.sdk.values.PCollectionTuple;
+import org.apache.beam.sdk.values.PCollectionView;
+import org.apache.beam.sdk.values.PValue;
+import org.apache.beam.sdk.values.TupleTag;
+import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Iterables;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Maps;
@@ -255,7 +266,7 @@ class JetTransformTranslators {
             }
 
             String transformName = appliedTransform.getFullName();
-            DistributedSupplier<Processor> processorSupplier = () -> new CreateViewProcessor(view);
+            SupplierEx<Processor> processorSupplier = () -> new CreateViewProcessor(view);
 
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
@@ -280,7 +291,7 @@ class JetTransformTranslators {
         @Override
         public void translate(Pipeline pipeline, TransformHierarchy.Node node, JetTranslationContext context) {
             AppliedPTransform<?, ?, ?> appliedTransform = node.toAppliedPTransform(pipeline);
-            DistributedSupplier<Processor> processorSupplier = Processors.mapP(DistributedFunction.identity());
+            SupplierEx<Processor> processorSupplier = Processors.mapP(FunctionEx.identity());
 
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(appliedTransform.getFullName());
@@ -312,8 +323,8 @@ class JetTransformTranslators {
                     (WindowingStrategy<T, ? extends BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
             WindowFn<T, ? extends BoundedWindow> windowFn = windowingStrategy.getWindowFn();
 
-            DistributedSupplier<Processor> processorSupplier = Processors.flatMapP(
-                    (DistributedFunction<Object, Traverser<?>>) o -> {
+            SupplierEx<Processor> processorSupplier = Processors.flatMapP(
+                    (FunctionEx<Object, Traverser<?>>) o -> {
                         WindowedValue input = (WindowedValue) o;
                         Collection<? extends BoundedWindow> windows = null; //todo: tons of garbage!
                         try {

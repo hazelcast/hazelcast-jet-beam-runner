@@ -5,9 +5,9 @@ import com.hazelcast.jet.aggregate.AggregateOperation;
 import com.hazelcast.jet.aggregate.AggregateOperations;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
-import com.hazelcast.jet.function.DistributedFunction;
-import com.hazelcast.jet.function.DistributedSupplier;
-import com.hazelcast.jet.function.DistributedTriFunction;
+import com.hazelcast.jet.function.FunctionEx;
+import com.hazelcast.jet.function.SupplierEx;
+import com.hazelcast.jet.function.TriFunction;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
 import org.apache.beam.sdk.transforms.windowing.TimestampCombiner;
@@ -18,7 +18,13 @@ import org.apache.beam.sdk.values.WindowingStrategy;
 import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -26,9 +32,9 @@ import java.util.stream.Stream;
 import static com.hazelcast.jet.Traversers.traverseStream;
 import static com.hazelcast.util.Preconditions.checkTrue;
 
-public class GroupByKeyProcessorSupplier<K, InputT> implements DistributedSupplier<Processor> {
+public class GroupByKeyProcessorSupplier<K, InputT> implements SupplierEx<Processor> {
 
-    private final DistributedSupplier<Processor> underlying;
+    private final SupplierEx<Processor> underlying;
 
     public GroupByKeyProcessorSupplier(WindowingStrategy windowingStrategy) {
         this.underlying = () -> new WindowGroupP<>(
@@ -46,20 +52,20 @@ public class GroupByKeyProcessorSupplier<K, InputT> implements DistributedSuppli
     }
 
     private static class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
-        private final List<DistributedFunction<?, ? extends K>> groupKeyFns;
-        private final List<DistributedFunction<?, Collection<? extends W>>> groupWindowFns;
-        private final DistributedFunction<Map<K, Map<W, A>>, Map<K, Map<W, A>>> mergeWindowsFn;
+        private final List<FunctionEx<?, ? extends K>> groupKeyFns;
+        private final List<FunctionEx<?, Collection<? extends W>>> groupWindowFns;
+        private final FunctionEx<Map<K, Map<W, A>>, Map<K, Map<W, A>>> mergeWindowsFn;
         private final AggregateOperation<A, R> aggrOp;
-        private final DistributedTriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn;
+        private final TriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn;
 
         private final Map<K, Map<W, A>> KeyToWindowToAcc = new HashMap<>();
 
         WindowGroupP(
-                DistributedFunction<?, ? extends K> groupKeyFn,
-                DistributedFunction<?, Collection<? extends W>> groupWindowFn,
-                DistributedFunction<Map<K, Map<W, A>>, Map<K, Map<W, A>>> mergeWindowsFn,
+                FunctionEx<?, ? extends K> groupKeyFn,
+                FunctionEx<?, Collection<? extends W>> groupWindowFn,
+                FunctionEx<Map<K, Map<W, A>>, Map<K, Map<W, A>>> mergeWindowsFn,
                 AggregateOperation<A, R> aggrOp,
-                DistributedTriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn
+                TriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn
         ) {
             this.groupKeyFns = Collections.singletonList(groupKeyFn);
             checkTrue(groupKeyFns.size() == aggrOp.arity(), groupKeyFns.size() + " key functions " +
@@ -114,21 +120,21 @@ public class GroupByKeyProcessorSupplier<K, InputT> implements DistributedSuppli
         }
     }
 
-    private class WindowExtractorFunction implements DistributedFunction<WindowedValue<KV<K, InputT>>, Collection<? extends BoundedWindow>> {
+    private class WindowExtractorFunction implements FunctionEx<WindowedValue<KV<K, InputT>>, Collection<? extends BoundedWindow>> {
         @Override
         public Collection<? extends BoundedWindow> applyEx(WindowedValue<KV<K, InputT>> kvWindowedValue) {
             return kvWindowedValue.getWindows();
         }
     }
 
-    private class KeyExtractorFunction implements DistributedFunction<WindowedValue<KV<K, InputT>>, K> {
+    private class KeyExtractorFunction implements FunctionEx<WindowedValue<KV<K, InputT>>, K> {
         @Override
         public K applyEx(WindowedValue<KV<K, InputT>> kvWindowedValue) {
             return kvWindowedValue.getValue().getKey();
         }
     }
 
-    private class WindowMergingFunction implements DistributedFunction<Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>>, Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>>> {
+    private class WindowMergingFunction implements FunctionEx<Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>>, Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>>> {
 
         private final WindowFn windowFn;
 
@@ -195,7 +201,7 @@ public class GroupByKeyProcessorSupplier<K, InputT> implements DistributedSuppli
         }
     }
 
-    private class WindowedValueMerger implements DistributedTriFunction<K, BoundedWindow, List<WindowedValue<KV<K, InputT>>>, WindowedValue<KV<K, Iterable<InputT>>>> {
+    private class WindowedValueMerger implements TriFunction<K, BoundedWindow, List<WindowedValue<KV<K, InputT>>>, WindowedValue<KV<K, Iterable<InputT>>>> {
 
         private final TimestampCombiner timestampCombiner;
 

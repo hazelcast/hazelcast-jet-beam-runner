@@ -4,8 +4,16 @@ import com.hazelcast.jet.beam.DAGBuilder;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Edge;
 import com.hazelcast.jet.core.Processor;
-import com.hazelcast.jet.function.DistributedSupplier;
-import org.apache.beam.runners.core.*;
+import com.hazelcast.jet.function.SupplierEx;
+import org.apache.beam.runners.core.DoFnRunner;
+import org.apache.beam.runners.core.DoFnRunners;
+import org.apache.beam.runners.core.InMemoryStateInternals;
+import org.apache.beam.runners.core.NullSideInputReader;
+import org.apache.beam.runners.core.SideInputHandler;
+import org.apache.beam.runners.core.SideInputReader;
+import org.apache.beam.runners.core.StateInternals;
+import org.apache.beam.runners.core.StepContext;
+import org.apache.beam.runners.core.TimerInternals;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -119,7 +127,7 @@ abstract class AbstractParDoProcessor<InputT, OutputT> extends AbstractProcessor
         }
     }
 
-    abstract static class AbstractSupplier<InputT, OutputT> implements DistributedSupplier<Processor>, DAGBuilder.WiringListener {
+    abstract static class AbstractSupplier<InputT, OutputT> implements SupplierEx<Processor>, DAGBuilder.WiringListener {
         private final String ownerId;
 
         private final SerializablePipelineOptions pipelineOptions;
