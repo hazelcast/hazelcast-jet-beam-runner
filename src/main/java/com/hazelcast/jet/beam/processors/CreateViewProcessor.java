@@ -5,11 +5,10 @@ import com.hazelcast.jet.core.AbstractProcessor;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.PCollectionView;
 
-import java.io.Serializable;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
-public class CreateViewProcessor extends AbstractProcessor implements Serializable {
+public class CreateViewProcessor extends AbstractProcessor {
 
     private final PCollectionView view;
 

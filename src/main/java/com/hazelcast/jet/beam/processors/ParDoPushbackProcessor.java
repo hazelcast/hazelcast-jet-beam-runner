@@ -44,7 +44,6 @@ public class ParDoPushbackProcessor<InputT, OutputT> extends AbstractParDoProces
 
     @Override
     protected void init(Context context) throws Exception {
-        super.init(context);
         pushbackDoFnRunner = SimplePushbackSideInputDoFnRunner.create(doFnRunner, sideInputs, sideInputHandler);
     }
 

@@ -25,7 +25,6 @@ import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +32,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-abstract class AbstractParDoProcessor<InputT, OutputT> extends AbstractProcessor implements Serializable {
+abstract class AbstractParDoProcessor<InputT, OutputT> extends AbstractProcessor {
 
     private final SerializablePipelineOptions pipelineOptions;
     private final DoFn<InputT, OutputT> doFn;
@@ -44,10 +43,10 @@ abstract class AbstractParDoProcessor<InputT, OutputT> extends AbstractProcessor
     private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
     final List<PCollectionView<?>> sideInputs;
 
-    private transient DoFnInvoker<InputT, OutputT> doFnInvoker;
-    transient boolean emissionAttemptedAndFailed;
-    transient SideInputHandler sideInputHandler;
-    transient DoFnRunner<InputT, OutputT> doFnRunner;
+    private DoFnInvoker<InputT, OutputT> doFnInvoker;
+    boolean emissionAttemptedAndFailed;
+    SideInputHandler sideInputHandler;
+    DoFnRunner<InputT, OutputT> doFnRunner;
 
     AbstractParDoProcessor(
             DoFn<InputT, OutputT> doFn,
@@ -71,8 +70,6 @@ abstract class AbstractParDoProcessor<InputT, OutputT> extends AbstractProcessor
 
     @Override
     protected void init(Context context) throws Exception {
-        super.init(context);
-
         doFnInvoker = DoFnInvokers.invokerFor(doFn);
         doFnInvoker.invokeSetup();
 

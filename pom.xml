@@ -8,6 +8,11 @@
     <artifactId>hazelcast-beam-runner</artifactId>
     <version>0.1-SNAPSHOT</version>
 
+    <properties>
+        <hazelcast.jet.version>3.0-SNAPSHOT</hazelcast.jet.version>
+        <hazelcast.imdg.version>3.12-SNAPSHOT</hazelcast.imdg.version>
+    </properties>
+
     <dependencies>
         <!-- https://mvnrepository.com/artifact/org.slf4j/slf4j-api -->
         <dependency>
@@ -20,7 +25,7 @@
         <dependency>
             <groupId>com.hazelcast.jet</groupId>
             <artifactId>hazelcast-jet-core</artifactId>
-            <version>3.0-SNAPSHOT</version>
+            <version>${hazelcast.jet.version}</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.apache.beam/beam-runners-core-java -->
@@ -41,7 +46,7 @@
         <dependency>
             <groupId>com.hazelcast.jet</groupId>
             <artifactId>hazelcast-jet-core</artifactId>
-            <version>3.0-SNAPSHOT</version>
+            <version>${hazelcast.jet.version}</version>
             <classifier>tests</classifier>
             <scope>test</scope>
         </dependency>
@@ -49,7 +54,7 @@
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast</artifactId>
-            <version>3.12-SNAPSHOT</version>
+            <version>${hazelcast.imdg.version}</version>
             <classifier>tests</classifier>
             <scope>test</scope>
         </dependency>
@@ -57,7 +62,7 @@
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast-client</artifactId>
-            <version>3.12-SNAPSHOT</version>
+            <version>${hazelcast.imdg.version}</version>
             <classifier>tests</classifier>
             <scope>test</scope>
         </dependency>
