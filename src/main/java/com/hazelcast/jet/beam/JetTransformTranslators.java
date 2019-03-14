@@ -220,13 +220,12 @@ class JetTransformTranslators {
                 String transformName = appliedTransform.getFullName();
 
                 PCollection<KV<K, InputT>> input = Utils.getInput(appliedTransform);
-                TimestampCombiner timestampCombiner = input.getWindowingStrategy().getTimestampCombiner();
 
                 Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
 
                 DAGBuilder dagBuilder = context.getDagBuilder();
                 String vertexId = dagBuilder.newVertexId(transformName);
-                Vertex vertex = dagBuilder.addVertex(vertexId, new GroupByKeyProcessorSupplier<>(timestampCombiner));
+                Vertex vertex = dagBuilder.addVertex(vertexId, new GroupByKeyProcessorSupplier<>(input.getWindowingStrategy()));
 
                 dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
