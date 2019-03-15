@@ -3,116 +3,136 @@ package com.hazelcast.jet.beam.processors;
 import com.hazelcast.jet.Traverser;
 import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
-import com.hazelcast.jet.core.Inbox;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;
-import com.hazelcast.jet.function.ConsumerEx;
 import com.hazelcast.nio.Address;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.io.BoundedSource;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.util.WindowedValue;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
+import static com.hazelcast.jet.Traversers.traverseIterable;
+import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.IntStream.range;
 
-public class BoundedSourceProcessorSupplier implements ProcessorMetaSupplier {
+public class BoundedSourceProcessorSupplier<T> implements ProcessorMetaSupplier {
 
-    private final BoundedSource boundedSource;
+    private final BoundedSource<T> boundedSource;
     private final SerializablePipelineOptions options;
 
-    private transient int totalParallelism;
-    private transient int localParallelism;
+    private transient Context context;
+    private transient List<? extends BoundedSource<T>> shards;
 
-    public BoundedSourceProcessorSupplier(BoundedSource boundedSource, SerializablePipelineOptions options) {
+    public BoundedSourceProcessorSupplier(BoundedSource<T> boundedSource, SerializablePipelineOptions options) {
         this.boundedSource = boundedSource;
         this.options = options;
     }
 
     @Override
-    public void init(Context context) {
-        totalParallelism = context.totalParallelism();
-        localParallelism = context.localParallelism();
-    }
-
-    @Override
-    public void close(Throwable error) throws Exception {
-        //todo: close all opened readers
+    public void init(Context context) throws Exception {
+        this.context = context;
+        long desiredSizeBytes = Math.max(1, boundedSource.getEstimatedSizeBytes(options.get()) / context.totalParallelism());
+        shards = boundedSource.split(desiredSizeBytes, options.get());
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public Function<? super Address, ? extends ProcessorSupplier> get(List<Address> addresses) {
-        try {
-            long desiredSizeBytes = boundedSource.getEstimatedSizeBytes(options.get()) / (totalParallelism - 1);
-            List<? extends BoundedSource> shards = boundedSource.split(desiredSizeBytes, options.get());
-            int numShards = shards.size();
-            if (numShards != totalParallelism) {
-                //todo: remove//todo: handle this, distribute the leftover shards among processors
-            }
+        return address -> new SourceProcessorSupplier(
+                roundRobinSubList(shards, addresses.indexOf(address), addresses.size()), options);
+    }
 
-            Map<Address, ProcessorSupplier> map = new HashMap<>();
-            for (int i = 0; i < addresses.size(); i++) {
-                int globalIndexBase = localParallelism * i;
-                ProcessorSupplier supplier = processorCount ->
-                        range(globalIndexBase, globalIndexBase + processorCount)
-                                .mapToObj(
-                                        globalIndex -> {
-                                            if (globalIndex >= shards.size()) return new NoopP();
+    private static class SourceProcessorSupplier<T> implements ProcessorSupplier {
+        private final List<BoundedSource<T>> shards;
+        private final SerializablePipelineOptions options;
+        private transient Context context;
 
-                                            BoundedSource shard = shards.get(globalIndex);
-                                            return new ShardProcessor(shard, options.get());
-                                        }
-                                )
-                                .collect(toList());
-                map.put(addresses.get(i), supplier);
+        SourceProcessorSupplier(List<BoundedSource<T>> shards, SerializablePipelineOptions options) {
+            this.shards = shards;
+            this.options = options;
+        }
+
+        @Override
+        public void init(@Nonnull Context context) {
+            this.context = context;
+        }
+
+        @Nonnull @Override
+        public Collection<? extends Processor> get(int count) {
+            int indexBase = context.memberIndex() * context.localParallelism();
+            List<Processor> res = new ArrayList<>(count);
+            for (int i = 0; i < count; i++, indexBase++) {
+                res.add(new ShardProcessor<>(roundRobinSubList(shards, i, count), options.get()));
             }
-            return map::get;
-        } catch (Exception e) {
-            //todo: have to close all opened readers
-            throw new RuntimeException(e); //todo: what to do with the error?
+            return res;
         }
     }
 
-    private static class ShardProcessor extends AbstractProcessor implements Traverser {
+    private static class ShardProcessor<T> extends AbstractProcessor implements Traverser {
 
-        private BoundedSource.BoundedReader reader;
-        private boolean available;
+        private final Traverser<BoundedSource<T>> shardsTraverser;
+        private final PipelineOptions options;
 
-        ShardProcessor(BoundedSource source, PipelineOptions options) {
-            try {
-                this.reader = source.createReader(options);
-                this.available = reader.start();
-            } catch (IOException e) {
-                e.printStackTrace();
-                this.available = false; //todo: is this ok/enough?
-            }
+        private BoundedSource.BoundedReader currentReader;
+
+        ShardProcessor(List<BoundedSource<T>> shards, PipelineOptions options) {
+            this.shardsTraverser = traverseIterable(shards);
+            this.options = options;
+        }
+
+        @Override
+        protected void init(@Nonnull Context context) throws Exception {
+            nextShard();
         }
 
         @Override
         public Object next() {
-            try {
-                if (available) {
-                    Object item = reader.getCurrent();
-                    if (item == null) {
-                        item = Utils.getNull();
-                    }
-                    available = reader.advance();
-                    return WindowedValue.timestampedValueInGlobalWindow(item, reader.getCurrentTimestamp()); //todo: this might need to get more flexible
-                } else { //todo: is it ok to never check availability again?
-                    return null;
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                //todo: close the reader and make sure the traverser will know to emit null
+            if (currentReader == null) {
                 return null;
+            }
+            try {
+                Object item = currentReader.getCurrent();
+                if (item == null) {
+                    item = Utils.getNull();
+                }
+                //todo: this might need to get more flexible
+                WindowedValue<Object> res = WindowedValue.timestampedValueInGlobalWindow(item, currentReader.getCurrentTimestamp());
+                if (!currentReader.advance()) {
+                    nextShard();
+                }
+                return res;
+            } catch (IOException e) {
+                throw rethrow(e);
+            }
+        }
+
+        /**
+         * Called when currentReader is null or drained. At the end it will
+         * contain a started reader of the next shard or null.
+         */
+        private void nextShard() throws IOException {
+            for (;;) {
+                if (currentReader != null) {
+                    currentReader.close();
+                    currentReader = null;
+                }
+                BoundedSource<T> shard = shardsTraverser.next();
+                if (shard == null) {
+                    break; // all shards done
+                }
+                currentReader = shard.createReader(options);
+                if (currentReader.start()) {
+                    break;
+                }
             }
         }
 
@@ -120,18 +140,34 @@ public class BoundedSourceProcessorSupplier implements ProcessorMetaSupplier {
         public boolean complete() {
             return emitFromTraverser(this);
         }
-    }
-
-    private static class NoopP implements Processor { //todo: is in Processors, but it's private
-        @Override
-        public void process(int ordinal, Inbox inbox) {
-            inbox.drain(ConsumerEx.noop());
-        }
 
         @Override
-        public void restoreFromSnapshot(Inbox inbox) {
-            inbox.drain(ConsumerEx.noop());
+        public void close() throws Exception {
+            if (currentReader != null) {
+                currentReader.close();
+            }
         }
     }
 
+    /**
+     * Assigns the {@code list} to {@code count} sublists in a round-robin
+     * fashion. One call returns the {@code index}-th sublist.
+     *
+     * <p>For example, for a 7-element list where {@code count == 3}, it would
+     * respectively return for indices 0..2:
+     * <pre>
+     *   0, 3, 6
+     *   1, 4
+     *   2, 5
+     * </pre>
+     */
+    private static <E> List<E> roundRobinSubList(List<E> list, int index, int count) {
+        if (index < 0 || index >= count) {
+            throw new IllegalArgumentException("index=" + index + ", count=" + count);
+        }
+        return IntStream.range(0, list.size())
+                        .filter(i -> i % count == index)
+                        .mapToObj(list::get)
+                        .collect(toList());
+    }
 }
