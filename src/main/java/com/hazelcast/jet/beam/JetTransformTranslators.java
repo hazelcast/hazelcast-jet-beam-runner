@@ -4,8 +4,8 @@ import com.hazelcast.jet.Traverser;
 import com.hazelcast.jet.Traversers;
 import com.hazelcast.jet.beam.processors.BoundedSourceP;
 import com.hazelcast.jet.beam.processors.CreateViewProcessor;
-import com.hazelcast.jet.beam.processors.GroupByKeyProcessorSupplier;
 import com.hazelcast.jet.beam.processors.ParDoProcessor;
+import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.Vertex;
@@ -236,7 +236,7 @@ class JetTransformTranslators {
 
                 DAGBuilder dagBuilder = context.getDagBuilder();
                 String vertexId = dagBuilder.newVertexId(transformName);
-                Vertex vertex = dagBuilder.addVertex(vertexId, new GroupByKeyProcessorSupplier<>(input.getWindowingStrategy()));
+                Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(input.getWindowingStrategy()));
 
                 dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
