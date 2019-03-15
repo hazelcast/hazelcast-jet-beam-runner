@@ -18,6 +18,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static java.util.stream.Collectors.toList;
 
 public class Utils {
 
@@ -88,5 +91,27 @@ public class Utils {
 
         private static final Null INSTANCE = new Null();
 
+    }
+
+    /**
+     * Assigns the {@code list} to {@code count} sublists in a round-robin
+     * fashion. One call returns the {@code index}-th sublist.
+     *
+     * <p>For example, for a 7-element list where {@code count == 3}, it would
+     * respectively return for indices 0..2:
+     * <pre>
+     *   0, 3, 6
+     *   1, 4
+     *   2, 5
+     * </pre>
+     */
+    public static <E> List<E> roundRobinSubList(List<E> list, int index, int count) {
+        if (index < 0 || index >= count) {
+            throw new IllegalArgumentException("index=" + index + ", count=" + count);
+        }
+        return IntStream.range(0, list.size())
+                        .filter(i -> i % count == index)
+                        .mapToObj(list::get)
+                        .collect(toList());
     }
 }

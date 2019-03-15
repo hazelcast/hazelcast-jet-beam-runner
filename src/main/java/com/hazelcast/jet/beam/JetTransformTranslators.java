@@ -2,7 +2,7 @@ package com.hazelcast.jet.beam;
 
 import com.hazelcast.jet.Traverser;
 import com.hazelcast.jet.Traversers;
-import com.hazelcast.jet.beam.processors.BoundedSourceProcessorSupplier;
+import com.hazelcast.jet.beam.processors.BoundedSourceP;
 import com.hazelcast.jet.beam.processors.CreateViewProcessor;
 import com.hazelcast.jet.beam.processors.GroupByKeyProcessorSupplier;
 import com.hazelcast.jet.beam.processors.ParDoProcessor;
@@ -91,7 +91,7 @@ class JetTransformTranslators {
 
                 String transformName = appliedTransform.getFullName();
                 SerializablePipelineOptions pipelineOptions = context.getOptions();
-                ProcessorMetaSupplier processorSupplier = new BoundedSourceProcessorSupplier(source, pipelineOptions);
+                ProcessorMetaSupplier processorSupplier = BoundedSourceP.supplier(source, pipelineOptions);
 
                 DAGBuilder dagBuilder = context.getDagBuilder();
                 String vertexId = dagBuilder.newVertexId(transformName);
