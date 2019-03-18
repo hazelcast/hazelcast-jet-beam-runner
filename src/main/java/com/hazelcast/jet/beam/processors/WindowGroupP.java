@@ -55,7 +55,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
     private final AggregateOperation<A, R> aggrOp;
     private final TriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn;
 
-    private final Map<K, Map<W, A>> KeyToWindowToAcc = new HashMap<>();
+    private final Map<K, Map<W, A>> keyToWindowToAcc = new HashMap<>();
 
     private WindowGroupP(
             FunctionEx<?, ? extends K> groupKeyFn,
@@ -89,7 +89,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
         K key = keyFn.apply(item);
 
         for (W window : windows) {
-            A acc = KeyToWindowToAcc
+            A acc = keyToWindowToAcc
                     .computeIfAbsent(key, k -> new HashMap<>())
                     .computeIfAbsent(window, w -> aggrOp.createFn().get());
 
@@ -102,7 +102,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
     @Override
     public boolean complete() {
         Traverser<OUT> resultTraverser = traverseStream(
-                mergeWindowsFn.apply(KeyToWindowToAcc)
+                mergeWindowsFn.apply(keyToWindowToAcc)
                         .entrySet().stream()
                         .flatMap(
                                 mainEntry -> {
