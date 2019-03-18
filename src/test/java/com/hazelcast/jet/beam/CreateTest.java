@@ -19,12 +19,10 @@ package com.hazelcast.jet.beam;
 import org.apache.beam.sdk.coders.SerializableCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.testing.PAssert;
-import org.apache.beam.sdk.testing.ValidatesRunner;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 
 import static junit.framework.TestCase.assertEquals;
 import static org.apache.beam.sdk.TestUtils.LINES;
@@ -36,7 +34,6 @@ import static org.apache.beam.sdk.TestUtils.NO_LINES_ARRAY;
 public class CreateTest extends AbstractRunnerTest {
 
     @Test
-    @Category(ValidatesRunner.class)
     public void testCreate() {
         PCollection<String> output = pipeline.apply(Create.of(LINES));
 
@@ -45,7 +42,6 @@ public class CreateTest extends AbstractRunnerTest {
     }
 
     @Test
-    @Category(ValidatesRunner.class)
     public void testCreateEmpty() {
         PCollection<String> output = pipeline.apply(Create.empty(StringUtf8Coder.of()));
 
@@ -56,7 +52,6 @@ public class CreateTest extends AbstractRunnerTest {
     }
 
     @Test
-    @Category(ValidatesRunner.class)
     public void testCreateWithNullsAndValues() throws Exception {
         PCollection<String> output =
                 pipeline.apply(
@@ -67,7 +62,6 @@ public class CreateTest extends AbstractRunnerTest {
     }
 
     @Test
-    @Category(ValidatesRunner.class)
     public void testCreateWithVoidType() throws Exception {
         PCollection<Void> output = pipeline.apply(Create.of(null, (Void) null));
         PAssert.that(output).containsInAnyOrder(null, null);
@@ -75,7 +69,6 @@ public class CreateTest extends AbstractRunnerTest {
     }
 
     @Test
-    @Category(ValidatesRunner.class)
     public void testCreateWithKVVoidType() throws Exception {
         PCollection<KV<Void, Void>> output =
                 pipeline.apply(Create.of(KV.of(null, null), KV.of(null, null)));

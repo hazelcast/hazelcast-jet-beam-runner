@@ -23,10 +23,7 @@ import org.apache.beam.sdk.coders.CoderException;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.NullableCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
-import org.apache.beam.sdk.testing.DataflowPortabilityApiUnsupported;
 import org.apache.beam.sdk.testing.PAssert;
-import org.apache.beam.sdk.testing.UsesSideInputs;
-import org.apache.beam.sdk.testing.ValidatesRunner;
 import org.apache.beam.sdk.transforms.Combine;
 import org.apache.beam.sdk.transforms.CombineFns;
 import org.apache.beam.sdk.transforms.CombineWithContext;
@@ -46,7 +43,6 @@ import org.apache.beam.vendor.guava.v20_0.com.google.common.base.Objects;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.ImmutableList;
 import org.hamcrest.Matchers;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -63,7 +59,6 @@ import static org.junit.Assert.assertThat;
 public class ComposedCombineTest extends AbstractCombineTest {
 
     @Test
-    @Category({ValidatesRunner.class, UsesSideInputs.class, DataflowPortabilityApiUnsupported.class})
     public void testComposedCombine() {
         pipeline.getCoderRegistry().registerCoderForClass(UserString.class, UserStringCoder.of());
 
@@ -113,7 +108,6 @@ public class ComposedCombineTest extends AbstractCombineTest {
     }
 
     @Test
-    @Category({ValidatesRunner.class, UsesSideInputs.class, DataflowPortabilityApiUnsupported.class})
     public void testComposedCombineWithContext() {
         pipeline.getCoderRegistry().registerCoderForClass(UserString.class, UserStringCoder.of());
 
@@ -174,7 +168,6 @@ public class ComposedCombineTest extends AbstractCombineTest {
     }
 
     @Test
-    @Category({ValidatesRunner.class, DataflowPortabilityApiUnsupported.class})
     public void testComposedCombineNullValues() {
         pipeline.getCoderRegistry()
                 .registerCoderForClass(UserString.class, NullableCoder.of(UserStringCoder.of()));

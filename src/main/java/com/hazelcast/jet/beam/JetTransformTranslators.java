@@ -297,11 +297,9 @@ class JetTransformTranslators {
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
-            if (!mainInputs.isEmpty()) {
-                for (PValue value : mainInputs) {
-                    PCollection<T> input = (PCollection<T>) value;
-                    dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
-                }
+            for (PValue value : mainInputs) {
+                PCollection<T> input = (PCollection<T>) value;
+                dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
             }
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
