@@ -32,13 +32,15 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
 
-public abstract class AbstractRunnerTest {
+import java.io.Serializable;
+
+public abstract class AbstractRunnerTest implements Serializable {
 
     @Rule
-    public Timeout globalTimeout = Timeout.seconds(10); // 10 seconds max per method tested
+    public transient Timeout globalTimeout = Timeout.seconds(10); // 10 seconds max per method tested
 
     @Rule
-    public TestPipeline pipeline = getTestPipeline();
+    public transient TestPipeline pipeline = getTestPipeline();
 
     private static TestPipeline getTestPipeline() {
         System.setProperty(

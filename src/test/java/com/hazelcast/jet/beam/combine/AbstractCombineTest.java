@@ -18,7 +18,14 @@ package com.hazelcast.jet.beam.combine;
 
 import com.hazelcast.jet.beam.AbstractRunnerTest;
 import org.apache.beam.sdk.Pipeline;
-import org.apache.beam.sdk.coders.*;
+import org.apache.beam.sdk.coders.AtomicCoder;
+import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
+import org.apache.beam.sdk.coders.BigEndianLongCoder;
+import org.apache.beam.sdk.coders.Coder;
+import org.apache.beam.sdk.coders.CoderRegistry;
+import org.apache.beam.sdk.coders.DoubleCoder;
+import org.apache.beam.sdk.coders.KvCoder;
+import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.transforms.Combine;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.util.common.ElementByteSizeObserver;
@@ -34,7 +41,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-public abstract class AbstractCombineTest extends AbstractRunnerTest implements Serializable {
+public abstract class AbstractCombineTest extends AbstractRunnerTest {
 
     static final List<KV<String, Integer>> EMPTY_TABLE = Collections.emptyList();
 

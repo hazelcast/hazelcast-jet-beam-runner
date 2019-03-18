@@ -30,7 +30,9 @@ import org.junit.Test;
 import java.util.Arrays;
 
 import static org.apache.beam.vendor.guava.v20_0.com.google.common.base.Preconditions.checkNotNull;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.junit.Assert.assertThat;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.ParDoTest.TimestampTests */

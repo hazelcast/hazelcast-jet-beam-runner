@@ -16,14 +16,22 @@
 
 package com.hazelcast.jet.beam;
 
-import com.hazelcast.jet.beam.processors.*;
+import com.hazelcast.jet.beam.processors.AssignWindowProcessorSupplier;
+import com.hazelcast.jet.beam.processors.BoundedSourceP;
+import com.hazelcast.jet.beam.processors.CreateViewProcessor;
+import com.hazelcast.jet.beam.processors.ParDoProcessor;
+import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.Vertex;
 import com.hazelcast.jet.core.processor.Processors;
 import com.hazelcast.jet.function.FunctionEx;
 import com.hazelcast.jet.function.SupplierEx;
-import org.apache.beam.runners.core.construction.*;
+import org.apache.beam.runners.core.construction.CreatePCollectionViewTranslation;
+import org.apache.beam.runners.core.construction.PTransformTranslation;
+import org.apache.beam.runners.core.construction.ParDoTranslation;
+import org.apache.beam.runners.core.construction.ReadTranslation;
+import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.io.BoundedSource;
@@ -34,7 +42,15 @@ import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.util.WindowedValue;
-import org.apache.beam.sdk.values.*;
+import org.apache.beam.sdk.values.KV;
+import org.apache.beam.sdk.values.PBegin;
+import org.apache.beam.sdk.values.PCollection;
+import org.apache.beam.sdk.values.PCollectionList;
+import org.apache.beam.sdk.values.PCollectionTuple;
+import org.apache.beam.sdk.values.PCollectionView;
+import org.apache.beam.sdk.values.PValue;
+import org.apache.beam.sdk.values.TupleTag;
+import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Maps;
 
@@ -86,11 +102,11 @@ class JetTransformTranslators {
                 Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
 
                 String transformName = appliedTransform.getFullName();
-                SerializablePipelineOptions pipelineOptions = context.getOptions();
-                ProcessorMetaSupplier processorSupplier = BoundedSourceP.supplier(source, pipelineOptions);
-
                 DAGBuilder dagBuilder = context.getDagBuilder();
                 String vertexId = dagBuilder.newVertexId(transformName);
+                SerializablePipelineOptions pipelineOptions = context.getOptions();
+                ProcessorMetaSupplier processorSupplier = BoundedSourceP.supplier(source, pipelineOptions, vertexId);
+
                 Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
                 TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
@@ -163,18 +179,7 @@ class JetTransformTranslators {
                 throw new IllegalStateException("No outputs defined.");
             }
 
-            boolean usesStateOrTimers;
-            try {
-                usesStateOrTimers = ParDoTranslation.usesStateOrTimers(appliedTransform);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-
             Map<TupleTag<?>, Coder<?>> outputCoderMap = Utils.getOutputCoders(appliedTransform);
-
-            if (usesStateOrTimers) {
-                throw new UnsupportedOperationException(); //todo: implement
-            }
 
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
@@ -292,9 +297,7 @@ class JetTransformTranslators {
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
-            if (mainInputs.isEmpty()) {
-                throw new RuntimeException("Oops!");
-            } else {
+            if (!mainInputs.isEmpty()) {
                 for (PValue value : mainInputs) {
                     PCollection<T> input = (PCollection<T>) value;
                     dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);

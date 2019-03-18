@@ -95,20 +95,6 @@ public class Utils {
         return Collections.emptyList();
     }
 
-    public static Object getNull() {
-        return Null.INSTANCE;
-    }
-
-    public static boolean isNull(Object o) {
-        return o instanceof Null;
-    }
-
-    private static final class Null { //todo: is this safe? any other options for doing it?
-
-        private static final Null INSTANCE = new Null();
-
-    }
-
     /**
      * Assigns the {@code list} to {@code count} sublists in a round-robin
      * fashion. One call returns the {@code index}-th sublist.

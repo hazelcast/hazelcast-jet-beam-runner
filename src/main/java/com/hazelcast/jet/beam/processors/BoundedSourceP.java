@@ -17,7 +17,6 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
-import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
@@ -43,12 +42,14 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
 
     private final Traverser<BoundedSource<T>> shardsTraverser;
     private final PipelineOptions options;
+    private final String ownerId; //todo: do not remove it, very useful for debugging
 
     private BoundedSource.BoundedReader currentReader;
 
-    private BoundedSourceP(List<BoundedSource<T>> shards, PipelineOptions options) {
+    private BoundedSourceP(List<BoundedSource<T>> shards, PipelineOptions options, String ownerId) {
         this.shardsTraverser = traverseIterable(shards);
         this.options = options;
+        this.ownerId = ownerId;
     }
 
     @Override
@@ -63,9 +64,6 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
         }
         try {
             Object item = currentReader.getCurrent();
-            if (item == null) {
-                item = Utils.getNull();
-            }
             //todo: this might need to get more flexible
             WindowedValue<Object> res = WindowedValue.timestampedValueInGlobalWindow(item, currentReader.getCurrentTimestamp());
             if (!currentReader.advance()) {
@@ -82,7 +80,7 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
      * contain a started reader of the next shard or null.
      */
     private void nextShard() throws IOException {
-        for (;;) {
+        for (; ; ) {
             if (currentReader != null) {
                 currentReader.close();
                 currentReader = null;
@@ -112,21 +110,28 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
 
     public static <T> ProcessorMetaSupplier supplier(
             BoundedSource<T> boundedSource,
-            SerializablePipelineOptions options
+            SerializablePipelineOptions options,
+            String ownerId
     ) {
-        return new BoundedSourceMetaProcessorSupplier<>(boundedSource, options);
+        return new BoundedSourceMetaProcessorSupplier<>(boundedSource, options, ownerId);
     }
 
     private static class BoundedSourceMetaProcessorSupplier<T> implements ProcessorMetaSupplier {
 
         private final BoundedSource<T> boundedSource;
         private final SerializablePipelineOptions options;
+        private final String ownerId;
 
         private transient List<? extends BoundedSource<T>> shards;
 
-        private BoundedSourceMetaProcessorSupplier(BoundedSource<T> boundedSource, SerializablePipelineOptions options) {
+        private BoundedSourceMetaProcessorSupplier(
+                BoundedSource<T> boundedSource,
+                SerializablePipelineOptions options,
+                String ownerId
+        ) {
             this.boundedSource = boundedSource;
             this.options = options;
+            this.ownerId = ownerId;
         }
 
         @Override
@@ -136,21 +141,28 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
         }
 
         @SuppressWarnings("unchecked")
-        @Nonnull @Override
+        @Nonnull
+        @Override
         public Function<? super Address, ? extends ProcessorSupplier> get(@Nonnull List<Address> addresses) {
             return address -> new BoundedSourceProcessorSupplier(
-                    roundRobinSubList(shards, addresses.indexOf(address), addresses.size()), options);
+                    roundRobinSubList(shards, addresses.indexOf(address), addresses.size()), options, ownerId);
         }
     }
 
     private static class BoundedSourceProcessorSupplier<T> implements ProcessorSupplier {
         private final List<BoundedSource<T>> shards;
         private final SerializablePipelineOptions options;
+        private final String ownerId;
         private transient ProcessorSupplier.Context context;
 
-        private BoundedSourceProcessorSupplier(List<BoundedSource<T>> shards, SerializablePipelineOptions options) {
+        private BoundedSourceProcessorSupplier(
+                List<BoundedSource<T>> shards,
+                SerializablePipelineOptions options,
+                String ownerId
+        ) {
             this.shards = shards;
             this.options = options;
+            this.ownerId = ownerId;
         }
 
         @Override
@@ -158,12 +170,13 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
             this.context = context;
         }
 
-        @Nonnull @Override
+        @Nonnull
+        @Override
         public Collection<? extends Processor> get(int count) {
             int indexBase = context.memberIndex() * context.localParallelism();
             List<Processor> res = new ArrayList<>(count);
             for (int i = 0; i < count; i++, indexBase++) {
-                res.add(new BoundedSourceP<>(roundRobinSubList(shards, i, count), options.get()));
+                res.add(new BoundedSourceP<>(roundRobinSubList(shards, i, count), options.get(), ownerId));
             }
             return res;
         }

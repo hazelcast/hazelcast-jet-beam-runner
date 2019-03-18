@@ -46,7 +46,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 @SuppressWarnings("ALL")
-public abstract class AbstractParDoTest extends AbstractRunnerTest implements Serializable {
+public abstract class AbstractParDoTest extends AbstractRunnerTest {
 
     @Rule
     public transient ExpectedException thrown = ExpectedException.none();
