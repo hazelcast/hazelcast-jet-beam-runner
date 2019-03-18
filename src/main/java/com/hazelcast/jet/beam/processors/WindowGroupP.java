@@ -40,6 +40,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -56,6 +57,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
     private final TriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn;
 
     private final Map<K, Map<W, A>> keyToWindowToAcc = new HashMap<>();
+    private Traverser<OUT> resultTraverser;
 
     private WindowGroupP(
             FunctionEx<?, ? extends K> groupKeyFn,
@@ -64,6 +66,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
             AggregateOperation<A, R> aggrOp,
             TriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn
     ) {
+        // todo handle more inputs
         this.groupKeyFns = Collections.singletonList(groupKeyFn);
         checkTrue(groupKeyFns.size() == aggrOp.arity(), groupKeyFns.size() + " key functions " +
                 "provided for " + aggrOp.arity() + "-arity aggregate operation");
@@ -73,9 +76,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
                 "provided for " + aggrOp.arity() + "-arity aggregate operation");
 
         this.mergeWindowsFn = mergeWindowsFn;
-
         this.aggrOp = aggrOp;
-
         this.mapToOutputFn = mapToOutputFn;
     }
 
@@ -101,18 +102,20 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
 
     @Override
     public boolean complete() {
-        Traverser<OUT> resultTraverser = traverseStream(
-                mergeWindowsFn.apply(keyToWindowToAcc)
-                        .entrySet().stream()
-                        .flatMap(
-                                mainEntry -> {
-                                    K key = mainEntry.getKey();
-                                    Map<W, A> subEntry = mainEntry.getValue();
-                                    return subEntry.entrySet().stream()
-                                            .map(e -> mapToOutputFn.apply(key, e.getKey(), aggrOp.finishFn().apply(e.getValue())));
-                                }
-                        )
-        );
+        if (resultTraverser == null) {
+            resultTraverser = traverseStream(
+                    mergeWindowsFn.apply(keyToWindowToAcc)
+                                  .entrySet().stream()
+                                  .flatMap(
+                                          mainEntry -> {
+                                              K key = mainEntry.getKey();
+                                              Map<W, A> subEntry = mainEntry.getValue();
+                                              return subEntry.entrySet().stream()
+                                                             .map(e -> mapToOutputFn.apply(key, e.getKey(), aggrOp.finishFn().apply(e.getValue())));
+                                          }
+                                  )
+            );
+        }
         return emitFromTraverser(resultTraverser);
     }
 
@@ -156,7 +159,9 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
         }
     }
 
-    private static class WindowMergingFunction<K, InputT> implements FunctionEx<Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>>, Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>>> {
+    private static class WindowMergingFunction<K, InputT> implements FunctionEx<
+            Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>>,
+            Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>>> {
 
         private final WindowFn windowFn;
 
@@ -165,37 +170,42 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
         }
 
         @Override
-        public Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>> applyEx(Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>> keyToWindowToListMap) {
+        public Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>> applyEx(
+                Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>> keyToWindowToListMap
+        ) {
             if (windowFn.isNonMerging()) return keyToWindowToListMap;
 
-            try {
-                Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>> mergedKeyToWindowToListMap = new HashMap<>();
-                Map<BoundedWindow, BoundedWindow> initialToFinalWindows = new HashMap<>();
-                for (Map.Entry<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>> keyEntry : keyToWindowToListMap.entrySet()) {
-                    K key = keyEntry.getKey();
-                    Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>> windowToListMap = keyEntry.getValue();
+            Map<BoundedWindow, BoundedWindow> initialToFinalWindows = new HashMap<>();
+            for (Map.Entry<K, Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>>> keyEntry : keyToWindowToListMap.entrySet()) {
+                K key = keyEntry.getKey();
+                Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>> windowToListMap = keyEntry.getValue();
 
-                    initialToFinalWindows.clear();
+                initialToFinalWindows.clear();
+                try {
+                    // todo reuse the context
                     windowFn.mergeWindows(new MergeContextImpl(windowFn, windowToListMap.keySet(), initialToFinalWindows));
-
-                    for (Map.Entry<BoundedWindow, List<WindowedValue<KV<K, InputT>>>> windowEntry : windowToListMap.entrySet()) {
-                        BoundedWindow initialWindow = windowEntry.getKey();
-                        BoundedWindow finalWindow = initialToFinalWindows.getOrDefault(initialWindow, initialWindow);
-
-                        mergedKeyToWindowToListMap
-                                .computeIfAbsent(key, k -> new HashMap<>())
-                                .merge(
-                                        finalWindow,
-                                        windowEntry.getValue(),
-                                        (l1, l2) -> Stream.of(l1, l2).flatMap(Collection::stream).collect(Collectors.toList())
-                                );
-                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
 
-                return mergedKeyToWindowToListMap;
-            } catch (Exception e) {
-                throw new RuntimeException("Oops!"); //todo
+                // optimization - no need to rebuild the map
+                if (initialToFinalWindows.entrySet().stream().allMatch(en -> en.getKey().equals(en.getValue()))) {
+                    continue;
+                }
+
+                Map<BoundedWindow, List<WindowedValue<KV<K, InputT>>>> mergedWindowToListMap = new HashMap<>();
+                for (Entry<BoundedWindow, List<WindowedValue<KV<K, InputT>>>> windowEntry : windowToListMap.entrySet()) {
+                    BoundedWindow initialWindow = windowEntry.getKey();
+                    BoundedWindow finalWindow = initialToFinalWindows.getOrDefault(initialWindow, initialWindow);
+                    mergedWindowToListMap
+                            .merge(finalWindow,
+                                    windowEntry.getValue(),
+                                    (l1, l2) -> Stream.of(l1, l2).flatMap(Collection::stream).collect(Collectors.toList()));
+                }
+                keyToWindowToListMap.put(key, mergedWindowToListMap);
             }
+
+            return keyToWindowToListMap;
         }
     }
 
@@ -223,7 +233,8 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
         }
     }
 
-    private static class WindowedValueMerger<K, InputT> implements TriFunction<K, BoundedWindow, List<WindowedValue<KV<K, InputT>>>, WindowedValue<KV<K, Iterable<InputT>>>> {
+    private static class WindowedValueMerger<K, InputT> implements TriFunction<K, BoundedWindow,
+            List<WindowedValue<KV<K, InputT>>>, WindowedValue<KV<K, Iterable<InputT>>>> {
 
         private final TimestampCombiner timestampCombiner;
 
@@ -232,16 +243,22 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
         }
 
         @Override
-        public WindowedValue<KV<K, Iterable<InputT>>> applyEx(K k, BoundedWindow boundedWindow, List<WindowedValue<KV<K, InputT>>> windowedValues) throws Exception {
-            List<Instant> instants = new ArrayList<>(); //todo: garbage!
+        public WindowedValue<KV<K, Iterable<InputT>>> applyEx(
+                K k,
+                BoundedWindow boundedWindow,
+                List<WindowedValue<KV<K, InputT>>> windowedValues
+        ) {
+            assert !windowedValues.isEmpty() : "empty windowedValues";
+            Instant instant = null;
             PaneInfo pane = PaneInfo.NO_FIRING; //todo: is this the right default?
-            List<InputT> values = new ArrayList<>();
+            List<InputT> values = new ArrayList<>(windowedValues.size());
             for (WindowedValue<KV<K, InputT>> windowedValue : windowedValues) {
                 if (pane == null) pane = windowedValue.getPane();
-                instants.add(windowedValue.getTimestamp());
+                instant = instant == null ? windowedValue.getTimestamp()
+                        : timestampCombiner.combine(instant, windowedValue.getTimestamp());
                 values.add(windowedValue.getValue().getValue());
             }
-            return WindowedValue.of(KV.of(k, values), timestampCombiner.combine(instants), boundedWindow, pane);
+            return WindowedValue.of(KV.of(k, values), instant, boundedWindow, pane);
         }
     }
 }
