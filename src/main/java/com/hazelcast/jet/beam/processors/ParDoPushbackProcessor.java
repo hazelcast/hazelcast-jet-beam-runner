@@ -28,7 +28,8 @@ public class ParDoPushbackProcessor<InputT, OutputT> extends AbstractParDoProces
             TupleTag<OutputT> mainOutputTag,
             Coder<InputT> inputCoder,
             Map<TupleTag<?>, Coder<?>> outputCoderMap,
-            List<PCollectionView<?>> sideInputs
+            List<PCollectionView<?>> sideInputs,
+            String ownerId
     ) {
         super(
                 doFn,
@@ -38,7 +39,8 @@ public class ParDoPushbackProcessor<InputT, OutputT> extends AbstractParDoProces
                 mainOutputTag,
                 inputCoder,
                 outputCoderMap,
-                sideInputs
+                sideInputs,
+                ownerId
         );
     }
 
@@ -108,7 +110,8 @@ public class ParDoPushbackProcessor<InputT, OutputT> extends AbstractParDoProces
                     mainOutputTag,
                     inputCoder,
                     outputCoderMap,
-                    sideInputs
+                    sideInputs,
+                    ownerId
             );
         }
     }

@@ -1,22 +1,13 @@
 package com.hazelcast.jet.beam;
 
-import com.hazelcast.jet.Traverser;
-import com.hazelcast.jet.Traversers;
-import com.hazelcast.jet.beam.processors.BoundedSourceP;
-import com.hazelcast.jet.beam.processors.CreateViewProcessor;
-import com.hazelcast.jet.beam.processors.ParDoProcessor;
-import com.hazelcast.jet.beam.processors.WindowGroupP;
+import com.hazelcast.jet.beam.processors.*;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.Vertex;
 import com.hazelcast.jet.core.processor.Processors;
 import com.hazelcast.jet.function.FunctionEx;
 import com.hazelcast.jet.function.SupplierEx;
-import org.apache.beam.runners.core.construction.CreatePCollectionViewTranslation;
-import org.apache.beam.runners.core.construction.PTransformTranslation;
-import org.apache.beam.runners.core.construction.ParDoTranslation;
-import org.apache.beam.runners.core.construction.ReadTranslation;
-import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
+import org.apache.beam.runners.core.construction.*;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.io.BoundedSource;
@@ -26,21 +17,10 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
-import org.apache.beam.sdk.transforms.windowing.WindowFn;
 import org.apache.beam.sdk.util.WindowedValue;
-import org.apache.beam.sdk.values.KV;
-import org.apache.beam.sdk.values.PBegin;
-import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.PCollectionList;
-import org.apache.beam.sdk.values.PCollectionTuple;
-import org.apache.beam.sdk.values.PCollectionView;
-import org.apache.beam.sdk.values.PValue;
-import org.apache.beam.sdk.values.TupleTag;
-import org.apache.beam.sdk.values.WindowingStrategy;
-import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Iterables;
+import org.apache.beam.sdk.values.*;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Maps;
-import org.joda.time.Instant;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -248,8 +228,6 @@ class JetTransformTranslators {
             }
         }
 
-
-
     }
 
     private static class CreateViewTranslator<T> implements JetTransformTranslator<PTransform<PCollection<T>, PCollection<T>>> {
@@ -266,10 +244,10 @@ class JetTransformTranslators {
             }
 
             String transformName = appliedTransform.getFullName();
-            SupplierEx<Processor> processorSupplier = () -> new CreateViewProcessor(view);
-
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
+            SupplierEx<Processor> processorSupplier = () -> new CreateViewProcessor(view, vertexId);
+
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
             PCollection<T> input = Utils.getInput(appliedTransform);
@@ -321,28 +299,12 @@ class JetTransformTranslators {
                     (AppliedPTransform<PCollection<T>, PCollection<T>, PTransform<PCollection<T>, PCollection<T>>>) node.toAppliedPTransform(pipeline);
             WindowingStrategy<T, ? extends BoundedWindow> windowingStrategy =
                     (WindowingStrategy<T, ? extends BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
-            WindowFn<T, ? extends BoundedWindow> windowFn = windowingStrategy.getWindowFn();
-
-            SupplierEx<Processor> processorSupplier = Processors.flatMapP(
-                    (FunctionEx<Object, Traverser<?>>) o -> {
-                        WindowedValue input = (WindowedValue) o;
-                        Collection<? extends BoundedWindow> windows = null; //todo: tons of garbage!
-                        try {
-                            windows = windowFn.assignWindows(new WindowAssignContext<>(windowFn, input));
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            throw e;
-                        }
-
-                        return Traversers.traverseStream(
-                                windows.stream().map(window -> WindowedValue.of(input.getValue(), input.getTimestamp(), window, input.getPane()))
-                        );
-                    }
-            );
 
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
+            SupplierEx<Processor> processorSupplier = new AssignWindowProcessorSupplier(vertexId, windowingStrategy);
+
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
             PCollection<WindowedValue> input = Utils.getInput(appliedTransform);
@@ -352,38 +314,6 @@ class JetTransformTranslators {
             TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
             dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
-        }
-
-        private static class WindowAssignContext<InputT, W extends BoundedWindow> extends WindowFn<InputT, W>.AssignContext {
-            private final WindowedValue<InputT> value;
-
-            WindowAssignContext(WindowFn<InputT, W> fn, WindowedValue<InputT> value) {
-                fn.super();
-                if (Iterables.size(value.getWindows()) != 1) {
-                    throw new IllegalArgumentException(
-                            String.format(
-                                    "%s passed to window assignment must be in a single window, but it was in %s: %s",
-                                    WindowedValue.class.getSimpleName(),
-                                    Iterables.size(value.getWindows()),
-                                    value.getWindows()));
-                }
-                this.value = value;
-            }
-
-            @Override
-            public InputT element() {
-                return value.getValue();
-            }
-
-            @Override
-            public Instant timestamp() {
-                return value.getTimestamp();
-            }
-
-            @Override
-            public BoundedWindow window() {
-                return Iterables.getOnlyElement(value.getWindows());
-            }
         }
     }
 

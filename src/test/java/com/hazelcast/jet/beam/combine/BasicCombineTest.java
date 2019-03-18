@@ -1,6 +1,7 @@
 package com.hazelcast.jet.beam.combine;
 
-import org.apache.beam.sdk.coders.*;
+import org.apache.beam.sdk.coders.KvCoder;
+import org.apache.beam.sdk.coders.VarIntCoder;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.transforms.display.DisplayData;
@@ -9,19 +10,17 @@ import org.apache.beam.sdk.transforms.windowing.AfterPane;
 import org.apache.beam.sdk.transforms.windowing.GlobalWindows;
 import org.apache.beam.sdk.transforms.windowing.Repeatedly;
 import org.apache.beam.sdk.transforms.windowing.Window;
-import org.apache.beam.sdk.util.common.ElementByteSizeObserver;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.POutput;
-import org.apache.beam.vendor.guava.v20_0.com.google.common.base.MoreObjects;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.ImmutableSet;
 import org.joda.time.Duration;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 import static org.apache.beam.sdk.transforms.display.DisplayDataMatchers.hasDisplayItem;
 import static org.hamcrest.Matchers.hasItem;
@@ -247,102 +246,7 @@ public class BasicCombineTest extends AbstractCombineTest {
                         }));
     }
 
-    protected static class MeanInts extends Combine.AccumulatingCombineFn<Integer, MeanInts.CountSum, Double> {
-        private static final Coder<Long> LONG_CODER = BigEndianLongCoder.of();
-        private static final Coder<Double> DOUBLE_CODER = DoubleCoder.of();
 
-        static class CountSum
-                implements Combine.AccumulatingCombineFn.Accumulator<Integer, CountSum, Double> {
-            long count;
-            double sum;
-
-            CountSum(long count, double sum) {
-                this.count = count;
-                this.sum = sum;
-            }
-
-            @Override
-            public void addInput(Integer element) {
-                count++;
-                sum += element.doubleValue();
-            }
-
-            @Override
-            public void mergeAccumulator(CountSum accumulator) {
-                count += accumulator.count;
-                sum += accumulator.sum;
-            }
-
-            @Override
-            public Double extractOutput() {
-                return count == 0 ? 0.0 : sum / count;
-            }
-
-            @Override
-            public int hashCode() {
-                return Objects.hash(count, sum);
-            }
-
-            @Override
-            public boolean equals(Object obj) {
-                if (obj == this) {
-                    return true;
-                }
-                if (!(obj instanceof CountSum)) {
-                    return false;
-                }
-                CountSum other = (CountSum) obj;
-                return this.count == other.count && (Math.abs(this.sum - other.sum) < 0.1);
-            }
-
-            @Override
-            public String toString() {
-                return MoreObjects.toStringHelper(this).add("count", count).add("sum", sum).toString();
-            }
-        }
-
-        @Override
-        public CountSum createAccumulator() {
-            return new CountSum(0, 0.0);
-        }
-
-        @Override
-        public Coder<CountSum> getAccumulatorCoder(
-                CoderRegistry registry, Coder<Integer> inputCoder) {
-            return new CountSumCoder();
-        }
-
-        /** A {@link Coder} for {@link CountSum}. */
-        private static class CountSumCoder extends AtomicCoder<CountSum> {
-            @Override
-            public void encode(CountSum value, OutputStream outStream) throws IOException {
-                LONG_CODER.encode(value.count, outStream);
-                DOUBLE_CODER.encode(value.sum, outStream);
-            }
-
-            @Override
-            public CountSum decode(InputStream inStream) throws IOException {
-                long count = LONG_CODER.decode(inStream);
-                double sum = DOUBLE_CODER.decode(inStream);
-                return new CountSum(count, sum);
-            }
-
-            @Override
-            public void verifyDeterministic() {}
-
-            @Override
-            public boolean isRegisterByteSizeObserverCheap(CountSum value) {
-                return true;
-            }
-
-            @Override
-            public void registerByteSizeObserver(CountSum value, ElementByteSizeObserver observer)
-                    throws Exception {
-                LONG_CODER.registerByteSizeObserver(value.count, observer);
-                DOUBLE_CODER.registerByteSizeObserver(value.sum, observer);
-            }
-        }
-    }
 
     private static class GetLast extends DoFn<Integer, Integer> {
         @ProcessElement

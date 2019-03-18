@@ -20,4 +20,9 @@ public class SideInputValue {
     public WindowedValue<Iterable<?>> getWindowedValue() {
         return windowedValue;
     }
+
+    @Override
+    public String toString() {
+        return "SideInputValue (" + windowedValue + ")" ;
+    }
 }

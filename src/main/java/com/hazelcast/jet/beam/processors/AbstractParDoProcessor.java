@@ -42,6 +42,7 @@ abstract class AbstractParDoProcessor<InputT, OutputT> extends AbstractProcessor
     private final Coder<InputT> inputCoder;
     private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
     final List<PCollectionView<?>> sideInputs;
+    final String ownerId; //do not remove, useful for debugging
 
     private DoFnInvoker<InputT, OutputT> doFnInvoker;
     boolean emissionAttemptedAndFailed;
@@ -56,7 +57,8 @@ abstract class AbstractParDoProcessor<InputT, OutputT> extends AbstractProcessor
             TupleTag<OutputT> mainOutputTag,
             Coder<InputT> inputCoder,
             Map<TupleTag<?>, Coder<?>> outputCoderMap,
-            List<PCollectionView<?>> sideInputs
+            List<PCollectionView<?>> sideInputs,
+            String ownerId
     ) {
         this.pipelineOptions = pipelineOptions;
         this.doFn = doFn;
@@ -66,6 +68,7 @@ abstract class AbstractParDoProcessor<InputT, OutputT> extends AbstractProcessor
         this.inputCoder = inputCoder;
         this.outputCoderMap = outputCoderMap;
         this.sideInputs = sideInputs;
+        this.ownerId = ownerId;
     }
 
     @Override

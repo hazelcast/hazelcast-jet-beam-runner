@@ -24,7 +24,8 @@ public class ParDoProcessor<InputT, OutputT> extends AbstractParDoProcessor<Inpu
             TupleTag<OutputT> mainOutputTag,
             Coder<InputT> inputCoder,
             Map<TupleTag<?>, Coder<?>> outputCoderMap,
-            List<PCollectionView<?>> sideInputs
+            List<PCollectionView<?>> sideInputs,
+            String ownerId
     ) {
         super(
                 doFn,
@@ -34,7 +35,8 @@ public class ParDoProcessor<InputT, OutputT> extends AbstractParDoProcessor<Inpu
                 mainOutputTag,
                 inputCoder,
                 outputCoderMap,
-                sideInputs
+                sideInputs,
+                ownerId
         );
     }
 
@@ -42,12 +44,13 @@ public class ParDoProcessor<InputT, OutputT> extends AbstractParDoProcessor<Inpu
     protected boolean tryProcess(int ordinal, Object item) { //todo: this is reprocessing stuff as many times as emission fails...
         if (item instanceof SideInputValue) {
             SideInputValue sideInput = (SideInputValue) item;
-            sideInputHandler.addSideInputValue(sideInput.getView(), sideInput.getWindowedValue());
+            PCollectionView<?> sideInputView = sideInput.getView();
+            WindowedValue<Iterable<?>> sideInputValue = sideInput.getWindowedValue();
+            sideInputHandler.addSideInputValue(sideInputView, sideInputValue);
             return true;
         } else {
             //noinspection unchecked
             WindowedValue<InputT> windowedValue = (WindowedValue<InputT>) item;
-            if (windowedValue.getValue() == null) return true;
 
             emissionAttemptedAndFailed = false;
             doFnRunner.startBundle();
@@ -94,7 +97,8 @@ public class ParDoProcessor<InputT, OutputT> extends AbstractParDoProcessor<Inpu
                     mainOutputTag,
                     inputCoder,
                     outputCoderMap,
-                    sideInputs
+                    sideInputs,
+                    ownerId
             );
         }
     }
