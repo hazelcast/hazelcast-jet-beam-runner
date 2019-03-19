@@ -18,7 +18,7 @@ package com.hazelcast.jet.beam;
 
 import com.hazelcast.jet.beam.processors.AssignWindowProcessorSupplier;
 import com.hazelcast.jet.beam.processors.BoundedSourceP;
-import com.hazelcast.jet.beam.processors.CreateViewProcessor;
+import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.ParDoProcessor;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.Processor;
@@ -237,7 +237,7 @@ class JetTransformTranslators {
 
                 DAGBuilder dagBuilder = context.getDagBuilder();
                 String vertexId = dagBuilder.newVertexId(transformName);
-                Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(input.getWindowingStrategy()));
+                Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(input.getWindowingStrategy(), vertexId));
 
                 dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
@@ -267,11 +267,10 @@ class JetTransformTranslators {
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
-            SupplierEx<Processor> processorSupplier = () -> new CreateViewProcessor(view, vertexId);
-
-            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
-
             PCollection<T> input = Utils.getInput(appliedTransform);
+
+            Vertex vertex = dagBuilder.addVertex(vertexId, ViewP.supplier(view, input.getWindowingStrategy(), vertexId));
+
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
             TupleTag<?> viewTag = Utils.getTupleTag(view);

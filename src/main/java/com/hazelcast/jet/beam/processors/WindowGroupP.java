@@ -55,6 +55,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
     private final FunctionEx<Map<K, Map<W, A>>, Map<K, Map<W, A>>> mergeWindowsFn;
     private final AggregateOperation<A, R> aggrOp;
     private final TriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn;
+    private final String ownerId; //do not remove, useful for debugging
 
     private final Map<K, Map<W, A>> keyToWindowToAcc = new HashMap<>();
     private Traverser<OUT> resultTraverser;
@@ -64,7 +65,8 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
             FunctionEx<?, Collection<? extends W>> groupWindowFn,
             FunctionEx<Map<K, Map<W, A>>, Map<K, Map<W, A>>> mergeWindowsFn,
             AggregateOperation<A, R> aggrOp,
-            TriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn
+            TriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn,
+            String ownerId
     ) {
         // todo handle more inputs
         this.groupKeyFns = Collections.singletonList(groupKeyFn);
@@ -78,6 +80,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
         this.mergeWindowsFn = mergeWindowsFn;
         this.aggrOp = aggrOp;
         this.mapToOutputFn = mapToOutputFn;
+        this.ownerId = ownerId;
     }
 
     @Override
@@ -119,8 +122,8 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
         return emitFromTraverser(resultTraverser);
     }
 
-    public static SupplierEx<Processor> supplier(WindowingStrategy windowingStrategy) {
-        return new WindowGroupProcessorSupplier(windowingStrategy);
+    public static SupplierEx<Processor> supplier(WindowingStrategy windowingStrategy, String ownerId) {
+        return new WindowGroupProcessorSupplier(windowingStrategy, ownerId);
     }
 
     private static class WindowGroupProcessorSupplier implements SupplierEx<Processor> {
@@ -128,13 +131,14 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
         private final SupplierEx<Processor> underlying;
 
         @SuppressWarnings("unchecked")
-        private WindowGroupProcessorSupplier(WindowingStrategy windowingStrategy) {
+        private WindowGroupProcessorSupplier(WindowingStrategy windowingStrategy, String ownerId) {
             this.underlying = () -> new WindowGroupP<>(
                     new KeyExtractorFunction(),
                     new WindowExtractorFunction(),
                     new WindowMergingFunction(windowingStrategy.getWindowFn()),
                     AggregateOperations.toList(),
-                    new WindowedValueMerger(windowingStrategy.getTimestampCombiner())
+                    new WindowedValueMerger(windowingStrategy.getTimestampCombiner()),
+                    ownerId
             );
         }
 
@@ -249,16 +253,16 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
                 List<WindowedValue<KV<K, InputT>>> windowedValues
         ) {
             assert !windowedValues.isEmpty() : "empty windowedValues";
-            Instant instant = null;
-            PaneInfo pane = PaneInfo.NO_FIRING; //todo: is this the right default?
+            Instant timestamp = null;
+            PaneInfo paneInfo = PaneInfo.NO_FIRING;
             List<InputT> values = new ArrayList<>(windowedValues.size());
             for (WindowedValue<KV<K, InputT>> windowedValue : windowedValues) {
-                if (pane == null) pane = windowedValue.getPane();
-                instant = instant == null ? windowedValue.getTimestamp()
-                        : timestampCombiner.combine(instant, windowedValue.getTimestamp());
+                if (!paneInfo.equals(windowedValue.getPane())) throw new RuntimeException("Oops!");
+                timestamp = timestamp == null ? windowedValue.getTimestamp()
+                        : timestampCombiner.combine(timestamp, windowedValue.getTimestamp());
                 values.add(windowedValue.getValue().getValue());
             }
-            return WindowedValue.of(KV.of(k, values), instant, boundedWindow, pane);
+            return WindowedValue.of(KV.of(k, values), timestamp, boundedWindow, paneInfo);
         }
     }
 }
