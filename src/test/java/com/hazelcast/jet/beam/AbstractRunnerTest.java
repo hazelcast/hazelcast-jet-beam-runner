@@ -37,7 +37,7 @@ import java.io.Serializable;
 public abstract class AbstractRunnerTest implements Serializable {
 
     @Rule
-    public transient Timeout globalTimeout = Timeout.seconds(10); // 10 seconds max per method tested
+    public transient Timeout globalTimeout = Timeout.seconds(1000); // 10 seconds max per method tested
 
     @Rule
     public transient TestPipeline pipeline = getTestPipeline();

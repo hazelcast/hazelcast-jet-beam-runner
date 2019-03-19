@@ -50,7 +50,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class ParDoProcessor<InputT, OutputT> extends AbstractProcessor {
+public class ParDoP<InputT, OutputT> extends AbstractProcessor {
 
     private final SerializablePipelineOptions pipelineOptions;
     private final DoFn<InputT, OutputT> doFn;
@@ -68,7 +68,7 @@ public class ParDoProcessor<InputT, OutputT> extends AbstractProcessor {
     private SideInputHandler sideInputHandler;
     private DoFnRunner<InputT, OutputT> doFnRunner;
 
-    private ParDoProcessor(
+    private ParDoP(
             DoFn<InputT, OutputT> doFn,
             WindowingStrategy<?, ?> windowingStrategy,
             Map<TupleTag<?>, int[]> outputCollToOrdinals,
@@ -206,7 +206,7 @@ public class ParDoProcessor<InputT, OutputT> extends AbstractProcessor {
 
         @Override
         public Processor getEx() {
-            return new ParDoProcessor<>(
+            return new ParDoP<>(
                     doFn,
                     windowingStrategy,
                     outputCollToOrdinals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().stream().mapToInt(i -> i).toArray())),

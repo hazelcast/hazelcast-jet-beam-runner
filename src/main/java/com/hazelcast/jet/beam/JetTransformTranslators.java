@@ -19,7 +19,7 @@ package com.hazelcast.jet.beam;
 import com.hazelcast.jet.beam.processors.AssignWindowProcessorSupplier;
 import com.hazelcast.jet.beam.processors.BoundedSourceP;
 import com.hazelcast.jet.beam.processors.ViewP;
-import com.hazelcast.jet.beam.processors.ParDoProcessor;
+import com.hazelcast.jet.beam.processors.ParDoP;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
@@ -187,7 +187,7 @@ class JetTransformTranslators {
             SerializablePipelineOptions pipelineOptions = context.getOptions();
             Coder<InputT> coder = ((PCollection) Utils.getInput(appliedTransform)).getCoder();
             List<PCollectionView<?>> sideInputs = Utils.getSideInputs(appliedTransform);
-            ParDoProcessor.Supplier<InputT, OutputT> processorSupplier = new ParDoProcessor.Supplier<>(
+            ParDoP.Supplier<InputT, OutputT> processorSupplier = new ParDoP.Supplier<>(
                     vertexId,
                     doFn,
                     windowingStrategy[0],
