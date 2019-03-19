@@ -113,7 +113,6 @@ public class FlattenTest extends AbstractRunnerTest {
     }
 
     @Test
-    @Ignore //todo: requires the DAG to be a Multigraph, ie. have multiple edges between the same nodes (Flatten's main inputs contain the same PCollection twice)
     public void testFlattenInputMultipleCopies() {
         int count = 5;
         PCollection<Long> longs = pipeline.apply("mkLines", GenerateSequence.from(0).to(count));

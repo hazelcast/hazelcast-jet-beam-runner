@@ -31,14 +31,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class DAGBuilder {
 
     private final DAG dag = new DAG();
 
     private final Map<TupleTag, Vertex> edgeStartPoints = new HashMap<>();
-    private final Map<TupleTag, Set<Vertex>> edgeEndPoints = new HashMap<>();
+    private final Map<TupleTag, List<Vertex>> edgeEndPoints = new HashMap<>();
     private final Map<TupleTag, TupleTag> pCollsOfEdges = new HashMap<>();
 
     private final List<WiringListener> listeners = new ArrayList<>();
@@ -69,17 +68,9 @@ public class DAGBuilder {
     }
 
     void registerEdgeEndPoint(TupleTag<?> edgeId, Vertex vertex) {
-        edgeEndPoints.compute(
-                edgeId,
-                (v, oldPoints) -> {
-                    if (oldPoints == null) return Collections.singleton(vertex);
-
-                    Set<Vertex> newPoints = new HashSet<>(oldPoints);
-                    newPoints.add(vertex);
-
-                    return newPoints;
-                }
-        );
+        edgeEndPoints
+                .computeIfAbsent(edgeId, x -> new ArrayList<>())
+                .add(vertex);
     }
 
     Vertex addVertex(String id, ProcessorMetaSupplier processorMetaSupplier) {
@@ -114,9 +105,7 @@ public class DAGBuilder {
                 Vertex sourceVertex = edgeStartPoints.get(edgeId);
                 if (sourceVertex == null) throw new RuntimeException("Oops!");
 
-                Set<Vertex> destinationVertices = edgeEndPoints.get(edgeId);
-                if (destinationVertices == null || destinationVertices.isEmpty()) continue;
-
+                List<Vertex> destinationVertices = edgeEndPoints.getOrDefault(edgeId, Collections.emptyList());
                 boolean highPriorityEdge = edgeId.toString().contains("PCollectionView"); //todo: this is a hack!
                 for (Vertex destinationVertex : destinationVertices) {
                     addEdge(sourceVertex, destinationVertex, pCollId, highPriorityEdge);
@@ -140,9 +129,8 @@ public class DAGBuilder {
                     listener.isOutboundEdgeOfVertex(edge, pCollId, sourceVertexName);
                 }
             } catch (Exception e) {
-                e.printStackTrace(); //todo: what more to do with the error
+                throw new RuntimeException(e);
             }
-
         }
 
         private int getNextFreeOrdinal(Vertex vertex, boolean inbound) {
