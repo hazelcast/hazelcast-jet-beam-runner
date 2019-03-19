@@ -47,7 +47,7 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
 
     private BoundedSource.BoundedReader currentReader;
 
-    private BoundedSourceP(List<BoundedSource<T>> shards, PipelineOptions options, String ownerId) {
+    BoundedSourceP(List<BoundedSource<T>> shards, PipelineOptions options, String ownerId) {
         this.shardsTraverser = traverseIterable(shards);
         this.options = options;
         this.ownerId = ownerId;
