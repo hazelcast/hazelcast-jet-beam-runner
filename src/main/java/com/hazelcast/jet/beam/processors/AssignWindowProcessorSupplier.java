@@ -17,6 +17,7 @@ import java.util.Collection;
 
 public class AssignWindowProcessorSupplier implements SupplierEx<Processor> {
 
+    @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
     private final SupplierEx<Processor> underlying;
 

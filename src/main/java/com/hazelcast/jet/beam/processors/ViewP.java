@@ -30,6 +30,7 @@ import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.WindowingStrategy;
 import org.joda.time.Instant;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,6 +41,7 @@ public class ViewP extends AbstractProcessor {
 
     private final TimestampCombiner timestampCombiner;
     private final PCollectionView view;
+    @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
 
     private Map<BoundedWindow, List<Object>> values = new HashMap<>();
@@ -74,7 +76,7 @@ public class ViewP extends AbstractProcessor {
     }
 
     @Override
-    protected boolean tryProcess(int ordinal, Object item) {
+    protected boolean tryProcess(int ordinal, @Nonnull Object item) {
         WindowedValue windowedValue = (WindowedValue) item;
 
         for (BoundedWindow window : (Iterable<? extends BoundedWindow>) windowedValue.getWindows()) {

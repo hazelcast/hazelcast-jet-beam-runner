@@ -42,7 +42,8 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
 
     private final Traverser<BoundedSource<T>> shardsTraverser;
     private final PipelineOptions options;
-    private final String ownerId; //todo: do not remove it, very useful for debugging
+    @SuppressWarnings({"FieldCanBeLocal", "unused"})
+    private final String ownerId; //do not remove it, very useful for debugging
 
     private BoundedSource.BoundedReader currentReader;
 
@@ -64,7 +65,6 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
         }
         try {
             Object item = currentReader.getCurrent();
-            //todo: this might need to get more flexible
             WindowedValue<Object> res = WindowedValue.timestampedValueInGlobalWindow(item, currentReader.getCurrentTimestamp());
             if (!currentReader.advance()) {
                 nextShard();

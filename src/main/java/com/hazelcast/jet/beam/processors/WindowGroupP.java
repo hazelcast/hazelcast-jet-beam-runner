@@ -55,6 +55,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
     private final FunctionEx<Map<K, Map<W, A>>, Map<K, Map<W, A>>> mergeWindowsFn;
     private final AggregateOperation<A, R> aggrOp;
     private final TriFunction<? super K, ? super W, ? super R, OUT> mapToOutputFn;
+    @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
 
     private final Map<K, Map<W, A>> keyToWindowToAcc = new HashMap<>();
@@ -230,7 +231,7 @@ public class WindowGroupP<W, K, A, R, OUT> extends AbstractProcessor {
         }
 
         @Override
-        public void merge(Collection<BoundedWindow> toBeMerged, BoundedWindow mergeResult) throws Exception {
+        public void merge(Collection<BoundedWindow> toBeMerged, BoundedWindow mergeResult) {
             for (BoundedWindow w : toBeMerged) {
                 windowToMergeResult.put(w, mergeResult);
             }
