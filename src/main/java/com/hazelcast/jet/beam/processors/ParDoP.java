@@ -18,8 +18,9 @@ package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.beam.DAGBuilder;
 import com.hazelcast.jet.beam.SideInputValue;
-import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Edge;
+import com.hazelcast.jet.core.Inbox;
+import com.hazelcast.jet.core.Outbox;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.runners.core.DoFnRunner;
@@ -42,15 +43,18 @@ import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 
+import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
-public class ParDoP<InputT, OutputT> extends AbstractProcessor {
+public class ParDoP<InputT, OutputT> implements Processor {
 
     private final SerializablePipelineOptions pipelineOptions;
     private final DoFn<InputT, OutputT> doFn;
@@ -64,9 +68,9 @@ public class ParDoP<InputT, OutputT> extends AbstractProcessor {
     private final String ownerId; //do not remove, useful for debugging
 
     private DoFnInvoker<InputT, OutputT> doFnInvoker;
-    private boolean emissionAttemptedAndFailed;
     private SideInputHandler sideInputHandler;
     private DoFnRunner<InputT, OutputT> doFnRunner;
+    private JetOutputManager outputManager;
 
     private ParDoP(
             DoFn<InputT, OutputT> doFn,
@@ -91,24 +95,27 @@ public class ParDoP<InputT, OutputT> extends AbstractProcessor {
     }
 
     @Override
-    protected void init(@Nonnull Context context) {
+    public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
         doFnInvoker = DoFnInvokers.invokerFor(doFn);
         doFnInvoker.invokeSetup();
 
-        SideInputReader sideInputReader = NullSideInputReader.of(sideInputs);
+        SideInputReader sideInputReader;
         if (!sideInputs.isEmpty()) {
             sideInputHandler = new SideInputHandler(sideInputs, InMemoryStateInternals.forKey(null));
             sideInputReader = sideInputHandler;
+        } else {
+            sideInputReader = NullSideInputReader.of(sideInputs);
         }
 
+        outputManager = new JetOutputManager(outbox, outputCollToOrdinals);
         doFnRunner = DoFnRunners.simpleRunner(
                 pipelineOptions.get(),
                 doFn,
                 sideInputReader,
-                new JetOutputManager(),
+                outputManager,
                 mainOutputTag,
                 Lists.newArrayList(outputCollToOrdinals.keySet()),
-                new JetNoOpStepContext(),
+                new NotImplementedStepContext(),
                 inputCoder,
                 outputCoderMap,
                 windowingStrategy
@@ -121,40 +128,90 @@ public class ParDoP<InputT, OutputT> extends AbstractProcessor {
     }
 
     @Override
-    protected boolean tryProcess(int ordinal, @Nonnull Object item) { //todo: this is reprocessing stuff as many times as emission fails...
-        if (item instanceof SideInputValue) {
-            SideInputValue sideInput = (SideInputValue) item;
-            PCollectionView<?> sideInputView = sideInput.getView();
-            WindowedValue<Iterable<?>> sideInputValue = sideInput.getWindowedValue();
-            sideInputHandler.addSideInputValue(sideInputView, sideInputValue);
-            return true;
-        } else {
-            //noinspection unchecked
-            WindowedValue<InputT> windowedValue = (WindowedValue<InputT>) item;
-
-            emissionAttemptedAndFailed = false;
-            doFnRunner.startBundle();
-            doFnRunner.processElement(windowedValue); //todo: would be good if a bundle would contain more than one element... (see Inbox.drainTo)
-            doFnRunner.finishBundle();
-
-            return !emissionAttemptedAndFailed;
+    public void process(int ordinal, @Nonnull Inbox inbox) {
+        if (!outputManager.tryFlush()) {
+            // don't process more items until outputManager is empty
+            return;
         }
-    }
-
-    private class JetOutputManager implements DoFnRunners.OutputManager {
-        @Override
-        public <T> void output(TupleTag<T> tag, WindowedValue<T> output) {
-            //todo: is being called once for each output PCollections... how do we handle having managed to emit some of them, but not all?
-            //todo: test for such problems by setting queue size = 1 on all edges
-            int[] ordinals = outputCollToOrdinals.get(tag);
-            if (ordinals == null) throw new RuntimeException("Oops!");
-            if (ordinals.length > 0) {
-                emissionAttemptedAndFailed = !tryEmit(ordinals, output);
+        doFnRunner.startBundle();
+        for (Object item; (item = inbox.peek()) != null; ) {
+            if (item instanceof SideInputValue) {
+                SideInputValue sideInput = (SideInputValue) item;
+                PCollectionView<?> sideInputView = sideInput.getView();
+                WindowedValue<Iterable<?>> sideInputValue = sideInput.getWindowedValue();
+                sideInputHandler.addSideInputValue(sideInputView, sideInputValue);
+            } else {
+                //noinspection unchecked
+                WindowedValue<InputT> windowedValue = (WindowedValue<InputT>) item;
+                doFnRunner.processElement(windowedValue);
+            }
+            inbox.remove();
+            if (!outputManager.tryFlush()) {
+                break;
             }
         }
+        doFnRunner.finishBundle();
+        // finishBundle can also add items to outputManager, they will be flushed in tryProcess() or complete()
     }
 
-    public class JetNoOpStepContext implements StepContext {
+    @Override
+    public boolean tryProcess() {
+        return outputManager.tryFlush();
+    }
+
+    @Override
+    public boolean complete() {
+        return outputManager.tryFlush();
+    }
+
+    /**
+     * An output manager that stores the output in an ArrayList, one for each
+     * output ordinal, and a way to drain to outbox ({@link #tryFlush()}).
+     */
+    private static class JetOutputManager implements DoFnRunners.OutputManager {
+        private final Outbox outbox;
+        private final Map<TupleTag<?>, int[]> outputCollToOrdinals;
+        private final List<Object>[] outputBuckets;
+
+        // the flush position to continue flushing to outbox
+        private int currentBucket, currentItem;
+
+        @SuppressWarnings("unchecked")
+        JetOutputManager(Outbox outbox, Map<TupleTag<?>, int[]> outputCollToOrdinals) {
+            this.outbox = outbox;
+            this.outputCollToOrdinals = outputCollToOrdinals;
+            assert !outputCollToOrdinals.isEmpty();
+            int maxOrdinal = outputCollToOrdinals.values().stream().flatMapToInt(IntStream::of).max().orElse(-1);
+            outputBuckets = new List[maxOrdinal + 1];
+            Arrays.setAll(outputBuckets, i -> new ArrayList<>());
+        }
+
+        @Override
+        public <T> void output(TupleTag<T> tag, WindowedValue<T> output) {
+            assert currentBucket == 0 && currentItem == 0 : "adding output while flushing";
+            for (int ordinal : outputCollToOrdinals.get(tag)) {
+                outputBuckets[ordinal].add(output);
+            }
+        }
+
+        @CheckReturnValue
+        boolean tryFlush() {
+            for (; currentBucket < outputBuckets.length; currentBucket++) {
+                List<Object> bucket = outputBuckets[currentBucket];
+                for (; currentItem < bucket.size(); currentItem++) {
+                    if (!outbox.offer(currentBucket, bucket.get(currentItem))) {
+                        return false;
+                    }
+                }
+                bucket.clear();
+                currentItem = 0;
+            }
+            currentBucket = 0;
+            return true;
+        }
+    }
+
+    public class NotImplementedStepContext implements StepContext {
 
         //not really needed until we start implementing state & timers
 
