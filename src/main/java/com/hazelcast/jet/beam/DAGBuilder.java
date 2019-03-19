@@ -46,7 +46,7 @@ public class DAGBuilder {
     private int vertexId = 0;
 
     DAG getDag() {
-        vireUp();
+        wireUp();
         return dag;
     }
 
@@ -93,7 +93,7 @@ public class DAGBuilder {
                 ;
     }
 
-    private void vireUp() {
+    private void wireUp() {
         new WiringInstaller().wireUp();
     }
 
