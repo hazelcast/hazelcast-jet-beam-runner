@@ -37,6 +37,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Collects all input {@link WindowedValue}s, groups them by windows and when
+ * input is complete emits one {@link SideInputValue} for each window.
+ */
 public class ViewP extends AbstractProcessor {
 
     private final TimestampCombiner timestampCombiner;
@@ -44,8 +48,7 @@ public class ViewP extends AbstractProcessor {
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
 
-    private Map<BoundedWindow, List<Object>> values = new HashMap<>();
-    private Map<BoundedWindow, Instant> timestamps = new HashMap<>();
+    private Map<BoundedWindow, TimestampAndValues> values = new HashMap<>();
     private PaneInfo paneInfo = PaneInfo.NO_FIRING;
     private Traverser<SideInputValue> resultTraverser;
 
@@ -57,17 +60,15 @@ public class ViewP extends AbstractProcessor {
 
     @Override
     public boolean complete() {
-        if (values.isEmpty()) return true;
-
         if (resultTraverser == null) {
             resultTraverser = Traversers.traverseStream(
                     values.entrySet().stream()
                     .map(
                             e -> {
                                 BoundedWindow window = e.getKey();
-                                List<Object> values = e.getValue();
-                                Instant timestamp = timestamps.get(window);
-                                return new SideInputValue(view, WindowedValue.of(values, timestamp, Collections.singleton(window), paneInfo));
+                                TimestampAndValues value = e.getValue();
+                                return new SideInputValue(view,
+                                        WindowedValue.of(value.values, value.timestamp, Collections.singleton(window), paneInfo));
                             }
                     )
             );
@@ -77,41 +78,35 @@ public class ViewP extends AbstractProcessor {
 
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
-        WindowedValue windowedValue = (WindowedValue) item;
-
-        for (BoundedWindow window : (Iterable<? extends BoundedWindow>) windowedValue.getWindows()) {
+        WindowedValue<?> windowedValue = (WindowedValue<?>) item;
+        for (BoundedWindow window : windowedValue.getWindows()) {
             values
-                    .computeIfAbsent(window, w -> new ArrayList<>())
-                    .add(windowedValue.getValue());
-
-            timestamps.merge(
-                    window,
-                    windowedValue.getTimestamp(),
-                    (t1, t2) -> timestampCombiner.combine(t1, t2)
-            );
+                    .merge(window,
+                            new TimestampAndValues(windowedValue.getTimestamp(), windowedValue.getValue()),
+                            (o, n) -> o.merge(timestampCombiner, n));
         }
 
         if (!paneInfo.equals(windowedValue.getPane())) throw new RuntimeException("Oops!");
-
         return true;
     }
 
     public static SupplierEx<Processor> supplier(PCollectionView<?> view, WindowingStrategy<?, ?> windowingStrategy, String ownerId) {
-        return new ViewProcessorSupplier(view, windowingStrategy, ownerId);
+        return () -> new ViewP(view, windowingStrategy, ownerId);
     }
 
-    private static class ViewProcessorSupplier implements SupplierEx<Processor> {
+    private static class TimestampAndValues {
+        private Instant timestamp;
+        private final List<Object> values = new ArrayList<>();
 
-        private final SupplierEx<Processor> underlying;
-
-        private ViewProcessorSupplier(PCollectionView<?> view, WindowingStrategy<?, ?> windowingStrategy, String ownerId) {
-            this.underlying = () -> new ViewP(view, windowingStrategy, ownerId);
+        TimestampAndValues(Instant timestamp, Object value) {
+            this.timestamp = timestamp;
+            values.add(value);
         }
 
-        @Override
-        public Processor getEx() throws Exception {
-            return underlying.getEx();
+        TimestampAndValues merge(TimestampCombiner timestampCombiner, TimestampAndValues v2) {
+            timestamp = timestampCombiner.combine(timestamp, v2.timestamp);
+            values.addAll(v2.values);
+            return this;
         }
-
     }
 }
