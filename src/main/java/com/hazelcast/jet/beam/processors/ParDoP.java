@@ -18,6 +18,7 @@ package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.beam.DAGBuilder;
 import com.hazelcast.jet.beam.SideInputValue;
+import com.hazelcast.jet.beam.metrics.JetMetricsContainer;
 import com.hazelcast.jet.core.Edge;
 import com.hazelcast.jet.core.Inbox;
 import com.hazelcast.jet.core.Outbox;
@@ -34,6 +35,7 @@ import org.apache.beam.runners.core.StepContext;
 import org.apache.beam.runners.core.TimerInternals;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
+import org.apache.beam.sdk.metrics.MetricsEnvironment;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.reflect.DoFnInvoker;
 import org.apache.beam.sdk.transforms.reflect.DoFnInvokers;
@@ -71,6 +73,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
     private SideInputHandler sideInputHandler;
     private DoFnRunner<InputT, OutputT> doFnRunner;
     private JetOutputManager outputManager;
+    private JetMetricsContainer metricsContainer;
 
     private ParDoP(
             DoFn<InputT, OutputT> doFn,
@@ -96,6 +99,9 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
     @Override
     public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
+        metricsContainer = new JetMetricsContainer(ownerId, context);
+        MetricsEnvironment.setCurrentContainer(metricsContainer); //todo: this is correct only as long as the processor is non-cooperative
+
         doFnInvoker = DoFnInvokers.invokerFor(doFn);
         doFnInvoker.invokeSetup();
 
@@ -123,8 +129,16 @@ public class ParDoP<InputT, OutputT> implements Processor {
     }
 
     @Override
+    public boolean isCooperative() {
+        return false; //todo: re-examine later, we should be non-cooperative for doFns that do I/O, can be cooperative for others
+    }
+
+    @Override
     public void close() {
         doFnInvoker.invokeTeardown();
+
+        metricsContainer.flush();
+        MetricsEnvironment.setCurrentContainer(null);  //todo: this is correct only as long as the processor is non-cooperative
     }
 
     @Override
@@ -211,7 +225,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
         }
     }
 
-    public class NotImplementedStepContext implements StepContext {
+    private static class NotImplementedStepContext implements StepContext {
 
         //not really needed until we start implementing state & timers
 
@@ -291,4 +305,5 @@ public class ParDoP<InputT, OutputT> implements Processor {
             //do nothing
         }
     }
+
 }

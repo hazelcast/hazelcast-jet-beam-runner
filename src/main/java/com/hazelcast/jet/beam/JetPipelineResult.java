@@ -16,41 +16,44 @@
 
 package com.hazelcast.jet.beam;
 
+import com.hazelcast.jet.IMapJet;
 import com.hazelcast.jet.Job;
+import com.hazelcast.jet.beam.metrics.JetMetricResults;
 import com.hazelcast.jet.core.JobStatus;
+import org.apache.beam.runners.core.metrics.MetricUpdates;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.metrics.MetricResults;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import java.util.Objects;
 
 public class JetPipelineResult implements PipelineResult {
 
     private static final Logger LOG = LoggerFactory.getLogger(JetRunner.class);
 
-    private Job job;
+    private final Job job;
+    private final IMapJet<String, MetricUpdates> metricsAccumulator;
 
-    void setJob(Job job) {
-        this.job = job;
+    private final JetMetricResults metricResults = new JetMetricResults();
+
+    JetPipelineResult(Job job, IMapJet<String, MetricUpdates> metricsAccumulator) {
+        this.job = Objects.requireNonNull(job);
+        this.metricsAccumulator = Objects.requireNonNull(metricsAccumulator);
+        this.metricsAccumulator.addEntryListener(metricResults, true);
     }
 
     public State getState() {
-        if (job == null) return State.UNKNOWN;
         return getState(job);
     }
 
-    public State cancel() throws IOException {
-        if (job == null) return State.UNKNOWN; //todo: what to do?
-
+    public State cancel() {
         job.cancel();
         return getState(job);
     }
 
     public State waitUntilFinish(Duration duration) {
-        if (job == null) return State.UNKNOWN; //todo: what to do?
-
         return waitUntilFinish(); //todo: how to time out?
     }
 
@@ -66,7 +69,7 @@ public class JetPipelineResult implements PipelineResult {
     }
 
     public MetricResults metrics() {
-        return null; //todo
+        return metricResults;
     }
 
     private static State getState(Job job) {
