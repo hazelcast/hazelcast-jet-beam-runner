@@ -59,6 +59,20 @@ public class ViewP extends AbstractProcessor {
     }
 
     @Override
+    protected boolean tryProcess(int ordinal, @Nonnull Object item) {
+        WindowedValue<?> windowedValue = (WindowedValue<?>) item;
+        for (BoundedWindow window : windowedValue.getWindows()) {
+            values
+                    .merge(window,
+                            new TimestampAndValues(windowedValue.getTimestamp(), windowedValue.getValue()),
+                            (o, n) -> o.merge(timestampCombiner, n));
+        }
+
+        if (!paneInfo.equals(windowedValue.getPane())) throw new RuntimeException("Oops!");
+        return true;
+    }
+
+    @Override
     public boolean complete() {
         if (resultTraverser == null) {
             resultTraverser = Traversers.traverseStream(
@@ -74,20 +88,6 @@ public class ViewP extends AbstractProcessor {
             );
         }
         return emitFromTraverser(resultTraverser);
-    }
-
-    @Override
-    protected boolean tryProcess(int ordinal, @Nonnull Object item) {
-        WindowedValue<?> windowedValue = (WindowedValue<?>) item;
-        for (BoundedWindow window : windowedValue.getWindows()) {
-            values
-                    .merge(window,
-                            new TimestampAndValues(windowedValue.getTimestamp(), windowedValue.getValue()),
-                            (o, n) -> o.merge(timestampCombiner, n));
-        }
-
-        if (!paneInfo.equals(windowedValue.getPane())) throw new RuntimeException("Oops!");
-        return true;
     }
 
     public static SupplierEx<Processor> supplier(PCollectionView<?> view, WindowingStrategy<?, ?> windowingStrategy, String ownerId) {
