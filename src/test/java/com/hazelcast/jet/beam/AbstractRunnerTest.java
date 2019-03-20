@@ -33,6 +33,7 @@ import org.junit.Rule;
 import org.junit.rules.Timeout;
 
 import java.io.Serializable;
+import java.util.Map;
 
 public abstract class AbstractRunnerTest implements Serializable {
 
@@ -69,11 +70,22 @@ public abstract class AbstractRunnerTest implements Serializable {
         config.getHazelcastConfig().setProperty("hazelcast.logging.type", "log4j");
         config.getHazelcastConfig().addEventJournalConfig(new EventJournalConfig().setMapName("map"));
         instance = factory.newMember(config);
+
+        printEnv();
     }
 
     @AfterClass
     public static void afterClass() {
         factory.shutdownAll();
+    }
+
+    private static void printEnv() {
+        StringBuilder sb = new StringBuilder("The environment: ");
+        Map<String, String> env = System.getenv();
+        for (String envName : env.keySet()) {
+            sb.append("\n\t").append(envName).append("=").append(env.get(envName));
+        }
+        System.out.println(sb.toString());
     }
 
     protected static class FormatLongAsTextFn extends SimpleFunction<Long, String> {
