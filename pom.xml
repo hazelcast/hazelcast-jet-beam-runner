@@ -25,7 +25,7 @@
     <version>0.1-SNAPSHOT</version>
 
     <properties>
-        <argLine> <!-- surefire parameters -->
+        <surefire.argLine>
             -Xmx2G
             -Xms1G
             -XX:+AlwaysPreTouch
@@ -34,7 +34,7 @@
             -Dhazelcast.logging.type=log4j
             -Dhazelcast.test.use.network=false
             -Djava.net.preferIPv4Stack=true
-        </argLine>
+        </surefire.argLine>
         <hazelcast.jet.version>3.0-SNAPSHOT</hazelcast.jet.version>
         <hazelcast.imdg.version>3.12-SNAPSHOT</hazelcast.imdg.version>
         <apache.beam.version>2.11.0</apache.beam.version>
@@ -177,13 +177,6 @@
             <resource>
                 <directory>src/main/resources</directory>
             </resource>
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-                <includes>
-                    <include>**/*.properties</include>
-                </includes>
-            </resource>
         </resources>
         <plugins>
             <plugin>
@@ -195,7 +188,7 @@
                     <failIfNoTests>false</failIfNoTests>
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>
-                        ${argLine}
+                        ${surefire.argLine}
                     </argLine>
                     <includes>
                         <include>/com/hazelcast/jet/beam/**/**.java</include>
