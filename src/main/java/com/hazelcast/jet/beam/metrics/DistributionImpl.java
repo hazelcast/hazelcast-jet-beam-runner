@@ -35,11 +35,15 @@ public class DistributionImpl extends AbstractMetric<DistributionData> implement
 
     @Override
     public void update(long value) {
-        distributionData = DistributionData.singleton(value);
+        update(DistributionData.singleton(value));
     }
 
     @Override
     public void update(long sum, long count, long min, long max) {
-        distributionData = DistributionData.create(sum, count, min, max);
+        update(DistributionData.create(sum, count, min, max));
+    }
+
+    private void update(DistributionData update) {
+        distributionData = distributionData.combine(update);
     }
 }

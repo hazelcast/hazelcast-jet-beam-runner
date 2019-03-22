@@ -125,6 +125,15 @@ class JetTransformTranslators {
             AppliedPTransform<PCollection<InputT>, PCollection<OutputT>, PTransform<PCollection<InputT>, PCollection<OutputT>>> appliedTransform =
                     (AppliedPTransform<PCollection<InputT>, PCollection<OutputT>, PTransform<PCollection<InputT>, PCollection<OutputT>>>) node.toAppliedPTransform(pipeline);
 
+            boolean usesStateOrTimers;
+            try {
+                usesStateOrTimers = ParDoTranslation.usesStateOrTimers(appliedTransform);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            if (usesStateOrTimers) throw new UnsupportedOperationException("State and/or timers not supported at the moment!");
+
             DoFn<InputT, OutputT> doFn;
             try {
                 doFn = (DoFn<InputT, OutputT>) ParDoTranslation.getDoFn(appliedTransform);

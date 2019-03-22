@@ -27,30 +27,47 @@ import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.concurrent.GuardedBy;
 import java.util.Objects;
 
 public class JetPipelineResult implements PipelineResult {
 
     private static final Logger LOG = LoggerFactory.getLogger(JetRunner.class);
 
-    private final Job job;
     private final IMapJet<String, MetricUpdates> metricsAccumulator;
+
+    @GuardedBy("this")
+    private Job job = null;
+    @GuardedBy("this")
+    private State state = State.UNKNOWN;
 
     private final JetMetricResults metricResults = new JetMetricResults();
 
-    JetPipelineResult(Job job, IMapJet<String, MetricUpdates> metricsAccumulator) {
-        this.job = Objects.requireNonNull(job);
+    JetPipelineResult(IMapJet<String, MetricUpdates> metricsAccumulator) {
         this.metricsAccumulator = Objects.requireNonNull(metricsAccumulator);
         this.metricsAccumulator.addEntryListener(metricResults, true);
     }
 
-    public State getState() {
-        return getState(job);
+    synchronized void setJob(Job job) {
+        Job nonNullJob = job == null ? this.job : job;
+        this.state = getState(nonNullJob);
+        this.job = job;
+    }
+
+    public synchronized State getState() {
+        if (job != null) {
+            state = getState(job);
+        }
+        return state;
     }
 
     public State cancel() {
-        job.cancel();
-        return getState(job);
+        if (job != null) {
+            job.cancel();
+            job = null;
+            state = State.STOPPED;
+        }
+        return state;
     }
 
     public State waitUntilFinish(Duration duration) {
@@ -58,14 +75,16 @@ public class JetPipelineResult implements PipelineResult {
     }
 
     public State waitUntilFinish() {
-        try {
-            job.join();
-        } catch (Exception e) {
-            e.printStackTrace(); //todo: what to do?
-            return State.FAILED;
+        if (job != null) {
+            try {
+                job.join();
+            } catch (Exception e) {
+                e.printStackTrace(); //todo: what to do?
+                return State.FAILED;
+            }
+            state = getState(job);
         }
-
-        return getState(job);
+        return state;
     }
 
     public MetricResults metrics() {

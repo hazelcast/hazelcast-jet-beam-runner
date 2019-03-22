@@ -35,6 +35,14 @@ import java.util.Map;
 
 public class JetMetricsContainer implements MetricsContainer {
 
+    public static String toStepName(String ownerId, int globalIndex) {
+        return ownerId + "/" + globalIndex;
+    }
+
+    public static String ownerIdFromStepName(String stepName) {
+        return stepName.substring(0, stepName.indexOf('/'));
+    }
+
     public static final String METRICS_ACCUMULATOR_NAME = "metrics"; //todo: should be unique for the current pipeline, I guess
 
     private final String stepName;
@@ -46,7 +54,7 @@ public class JetMetricsContainer implements MetricsContainer {
     private final IMapJet<String, MetricUpdates> accumulator;
 
     public JetMetricsContainer(String ownerId, Processor.Context context) {
-        this.stepName = ownerId + "/" + context.globalProcessorIndex();
+        this.stepName = toStepName(ownerId, context.globalProcessorIndex());
         this.accumulator = context.jetInstance().getMap(METRICS_ACCUMULATOR_NAME);
     }
 

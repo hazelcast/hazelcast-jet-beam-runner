@@ -26,6 +26,7 @@ import com.hazelcast.jet.core.DAG;
 import org.apache.beam.runners.core.construction.UnconsumedReads;
 import org.apache.beam.runners.core.metrics.MetricUpdates;
 import org.apache.beam.sdk.Pipeline;
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.PipelineRunner;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.runners.PTransformOverride;
@@ -34,7 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
-public class JetRunner extends PipelineRunner<JetPipelineResult> {
+public class JetRunner extends PipelineRunner<PipelineResult> {
 
     public static JetRunner fromOptions(PipelineOptions options) {
         return fromOptions(options, Jet::newJetClient);
@@ -52,10 +53,14 @@ public class JetRunner extends PipelineRunner<JetPipelineResult> {
         this.jetClientSupplier = jetClientSupplier;
     }
 
-    public JetPipelineResult run(Pipeline pipeline) {
-        normalize(pipeline);
-        DAG dag = translate(pipeline);
-        return run(dag);
+    public PipelineResult run(Pipeline pipeline) {
+        try {
+            normalize(pipeline);
+            DAG dag = translate(pipeline);
+            return run(dag);
+        } catch (UnsupportedOperationException uoe) {
+            return new FailedRunningPipelineResults();
+        }
     }
 
     private void normalize(Pipeline pipeline) {
@@ -81,8 +86,11 @@ public class JetRunner extends PipelineRunner<JetPipelineResult> {
         JetInstance jet = getJetInstance(options);
         IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(JetMetricsContainer.METRICS_ACCUMULATOR_NAME);
         Job job = jet.newJob(dag);
-        JetPipelineResult result = new JetPipelineResult(job, metricsAccumulator);
+        JetPipelineResult result = new JetPipelineResult(metricsAccumulator);
+        result.setJob(job);
         job.join();
+        result.setJob(null);
+        jet.shutdown();
         return result;
     }
 

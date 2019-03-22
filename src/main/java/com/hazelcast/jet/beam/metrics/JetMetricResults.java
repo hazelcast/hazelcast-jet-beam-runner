@@ -56,7 +56,7 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
 
     private void mergeGauges(Iterable<MetricUpdate<GaugeData>> updates) {
         for (MetricUpdate<GaugeData> update : updates) {
-            MetricKey key = update.getKey();
+            MetricKey key = normalizeStepName(update.getKey());
             GaugeData oldGauge = gauges.getOrDefault(key, GaugeData.empty());
             GaugeData updatedGauge = update.getUpdate().combine(oldGauge);
             gauges.put(key, updatedGauge);
@@ -65,7 +65,7 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
 
     private void mergeDistributions(Iterable<MetricUpdate<DistributionData>> updates) {
         for (MetricUpdate<DistributionData> update : updates) {
-            MetricKey key = update.getKey();
+            MetricKey key = normalizeStepName(update.getKey());
             DistributionData oldDistribution = distributions.getOrDefault(key, DistributionData.EMPTY);
             DistributionData updatedDistribution = update.getUpdate().combine(oldDistribution);
             distributions.put(key, updatedDistribution);
@@ -74,11 +74,18 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
 
     private void mergeCounters(Iterable<MetricUpdate<Long>> updates) {
         for (MetricUpdate<Long> update : updates) {
-            MetricKey key = update.getKey();
+            MetricKey key = normalizeStepName(update.getKey());
             Long oldValue = counters.getOrDefault(key, 0L);
             Long updatedValue = oldValue + update.getUpdate();
             counters.put(key, updatedValue);
         }
+    }
+
+    private static MetricKey normalizeStepName(MetricKey key) {
+        return MetricKey.create(
+                JetMetricsContainer.ownerIdFromStepName(key.stepName()),
+                key.metricName()
+        );
     }
 
     @Override

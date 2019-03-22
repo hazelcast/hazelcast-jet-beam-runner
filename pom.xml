@@ -234,7 +234,7 @@
                                     <arguments>
                                         <argument>--runner=JetRunner</argument>
                                         <argument>--streaming=false</argument>
-                                        <argument>--suite=STRESS</argument>
+                                        <argument>--suite=SMOKE</argument>
                                         <argument>--manageResources=false</argument>
                                         <argument>--monitorJobs=true</argument>
                                         <argument>--jetGroupName=jet</argument>
