@@ -16,10 +16,10 @@
 
 package com.hazelcast.jet.beam;
 
-import com.hazelcast.jet.beam.processors.AssignWindowProcessorSupplier;
+import com.hazelcast.jet.beam.processors.AssignWindowP;
 import com.hazelcast.jet.beam.processors.BoundedSourceP;
-import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.ParDoP;
+import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
@@ -328,7 +328,7 @@ class JetTransformTranslators {
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
-            SupplierEx<Processor> processorSupplier = new AssignWindowProcessorSupplier(vertexId, windowingStrategy);
+            SupplierEx<Processor> processorSupplier = AssignWindowP.supplier(windowingStrategy, vertexId);
 
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
