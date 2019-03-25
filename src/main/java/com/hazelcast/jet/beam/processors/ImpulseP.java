@@ -16,33 +16,22 @@
 
 package com.hazelcast.jet.beam.processors;
 
-import com.hazelcast.jet.Traverser;
-import com.hazelcast.jet.Traversers;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.util.WindowedValue;
 
-import javax.annotation.Nonnull;
-
 public class ImpulseP extends AbstractProcessor {
 
     private final String ownerId; //do not remove it, very useful for debugging
-
-    private Traverser<WindowedValue<byte[]>> traverser;
 
     public ImpulseP(String ownerId) {
         this.ownerId = ownerId;
     }
 
     @Override
-    protected void init(@Nonnull Context context) throws Exception {
-        traverser = Traversers.singleton(WindowedValue.valueInGlobalWindow(new byte[0])); //todo: should EACH processor emit this byte[] or just a SINGLE one?
-    }
-
-    @Override
     public boolean complete() {
-        return emitFromTraverser(traverser);
+        return tryEmit(WindowedValue.valueInGlobalWindow(new byte[0])); //todo: should EACH processor emit this byte[] or just a SINGLE one?
     }
 
     public static SupplierEx<Processor> supplier(String ownerId) {
