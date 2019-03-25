@@ -35,10 +35,9 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
 
-import java.io.Serializable;
 import java.util.Map;
 
-public abstract class AbstractTransformTest implements Serializable {
+public abstract class AbstractTransformTest {
 
     @Rule
     public Timeout globalTimeout = Timeout.seconds(1000); // 10 seconds max per method tested
