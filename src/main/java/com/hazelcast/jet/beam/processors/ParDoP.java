@@ -221,7 +221,11 @@ public class ParDoP<InputT, OutputT> implements Processor {
                 currentItem = 0;
             }
             currentBucket = 0;
-            return true;
+            int sum = 0;
+            for (List<Object> outputBucket : outputBuckets) {
+                sum += outputBucket.size();
+            }
+            return sum == 0;
         }
     }
 
@@ -305,5 +309,4 @@ public class ParDoP<InputT, OutputT> implements Processor {
             //do nothing
         }
     }
-
 }
