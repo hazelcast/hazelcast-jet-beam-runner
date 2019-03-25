@@ -30,6 +30,16 @@ import java.util.Collections;
 
 public class FailedRunningPipelineResults implements PipelineResult {
 
+    private final RuntimeException cause;
+
+    public FailedRunningPipelineResults(RuntimeException cause) {
+        this.cause = cause;
+    }
+
+    public RuntimeException getCause() {
+        return cause;
+    }
+
     @Override
     public State getState() {
         return State.DONE;

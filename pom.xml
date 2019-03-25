@@ -176,6 +176,14 @@
             <groupId>org.apache.beam</groupId>
             <artifactId>beam-sdks-java-nexmark</artifactId>
             <version>${apache.beam.version}</version>
+
+            <!-- Excluding this in order to avoid multiple SLF4J bindings -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-jdk14</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 

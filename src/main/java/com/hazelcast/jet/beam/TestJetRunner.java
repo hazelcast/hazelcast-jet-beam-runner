@@ -41,6 +41,11 @@ public class TestJetRunner extends PipelineRunner<PipelineResult> {
 
     @Override
     public PipelineResult run(Pipeline pipeline) {
-        return delegate.run(pipeline);
+        PipelineResult result = delegate.run(pipeline);
+        if (result instanceof FailedRunningPipelineResults) {
+            RuntimeException failureCause = ((FailedRunningPipelineResults) result).getCause();
+            throw failureCause;
+        }
+        return result;
     }
 }

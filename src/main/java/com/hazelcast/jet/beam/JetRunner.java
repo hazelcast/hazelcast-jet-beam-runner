@@ -23,7 +23,11 @@ import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.beam.metrics.JetMetricsContainer;
 import com.hazelcast.jet.core.DAG;
+import org.apache.beam.runners.core.construction.JavaReadViaImpulse;
+import org.apache.beam.runners.core.construction.PipelineTranslation;
 import org.apache.beam.runners.core.construction.UnconsumedReads;
+import org.apache.beam.runners.core.construction.graph.ExecutableStage;
+import org.apache.beam.runners.core.construction.graph.GreedyPipelineFuser;
 import org.apache.beam.runners.core.metrics.MetricUpdates;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
@@ -33,6 +37,7 @@ import org.apache.beam.sdk.runners.PTransformOverride;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 
 public class JetRunner extends PipelineRunner<PipelineResult> {
@@ -59,7 +64,7 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
             DAG dag = translate(pipeline);
             return run(dag);
         } catch (UnsupportedOperationException uoe) {
-            return new FailedRunningPipelineResults();
+            return new FailedRunningPipelineResults(uoe);
         }
     }
 
@@ -76,6 +81,9 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         /*PrintFullGraphVisitor printFullVisitor = new PrintFullGraphVisitor();
         pipeline.traverseTopologically(printFullVisitor);
         System.out.println("Beam pipeline:" + printFullVisitor.print()); //todo: remove*/
+
+        Set<ExecutableStage> fusedStages = GreedyPipelineFuser.fuse(PipelineTranslation.toProto(pipeline)).getFusedStages();
+        System.out.println("Pipeline fused into " + fusedStages.size() + " stages"); //todo: remove
 
         JetGraphVisitor graphVisitor = new JetGraphVisitor(options);
         pipeline.traverseTopologically(graphVisitor);
@@ -110,9 +118,7 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
     }
 
     private static List<PTransformOverride> getDefaultOverrides() {
-        //todo: Combine.globally(SumLongs) is built up from 7 nodes... see Combine.Globally.expand()
-        //todo: more replacements?
-        return Collections.emptyList();
+        return Collections.singletonList(JavaReadViaImpulse.boundedOverride());
     }
 
     private static JetRunnerOptions validate(JetRunnerOptions options) {

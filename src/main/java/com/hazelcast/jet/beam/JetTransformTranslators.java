@@ -18,6 +18,7 @@ package com.hazelcast.jet.beam;
 
 import com.hazelcast.jet.beam.processors.AssignWindowP;
 import com.hazelcast.jet.beam.processors.BoundedSourceP;
+import com.hazelcast.jet.beam.processors.ImpulseP;
 import com.hazelcast.jet.beam.processors.ParDoP;
 import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
@@ -77,6 +78,7 @@ class JetTransformTranslators {
         TRANSLATORS.put(PTransformTranslation.GROUP_BY_KEY_TRANSFORM_URN, new GroupByKeyTranslator());
         TRANSLATORS.put(PTransformTranslation.FLATTEN_TRANSFORM_URN, new FlattenTranslator());
         TRANSLATORS.put(PTransformTranslation.ASSIGN_WINDOWS_TRANSFORM_URN, new WindowTranslator());
+        TRANSLATORS.put(PTransformTranslation.IMPULSE_TRANSFORM_URN, new ImpulseTranslator());
     }
 
     static JetTransformTranslator<?> getTranslator(PTransform<?, ?> transform) {
@@ -334,6 +336,25 @@ class JetTransformTranslators {
 
             PCollection<WindowedValue> input = Utils.getInput(appliedTransform);
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
+
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
+        }
+    }
+
+    private static class ImpulseTranslator implements JetTransformTranslator<PTransform<PBegin, PCollection<byte[]>>> {
+        @Override
+        public void translate(Pipeline pipeline, TransformHierarchy.Node node, JetTranslationContext context) {
+            AppliedPTransform<?, ?, ?> appliedTransform = node.toAppliedPTransform(pipeline);
+
+            String transformName = appliedTransform.getFullName();
+            DAGBuilder dagBuilder = context.getDagBuilder();
+            String vertexId = dagBuilder.newVertexId(transformName);
+            SupplierEx<Processor> processorSupplier = ImpulseP.supplier(vertexId);
+
+            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
