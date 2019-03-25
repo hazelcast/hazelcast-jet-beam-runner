@@ -246,7 +246,6 @@
                                         <argument>--manageResources=false</argument>
                                         <argument>--monitorJobs=true</argument>
                                         <argument>--jetGroupName=jet</argument>
-                                        <argument>--jetGroupPassword=</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

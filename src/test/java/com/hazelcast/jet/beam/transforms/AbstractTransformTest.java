@@ -35,15 +35,16 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
 
+import java.io.Serializable;
 import java.util.Map;
 
-public abstract class AbstractTransformTest {
+public abstract class AbstractTransformTest implements Serializable { //has to be set Serializable because the way how side inputs are being used via capturing lambdas
 
     @Rule
-    public Timeout globalTimeout = Timeout.seconds(1000); // 10 seconds max per method tested
+    public transient Timeout globalTimeout = Timeout.seconds(1000); // 10 seconds max per method tested
 
     @Rule
-    public TestPipeline pipeline = getTestPipeline();
+    public transient TestPipeline pipeline = getTestPipeline();
 
     private static TestPipeline getTestPipeline() {
         PipelineOptions options = PipelineOptionsFactory.create();
