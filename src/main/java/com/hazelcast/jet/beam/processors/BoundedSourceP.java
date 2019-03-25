@@ -102,6 +102,11 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
     }
 
     @Override
+    public boolean isCooperative() {
+        return false;
+    }
+
+    @Override
     public void close() throws Exception {
         if (currentReader != null) {
             currentReader.close();

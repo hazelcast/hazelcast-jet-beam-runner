@@ -21,7 +21,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.hazelcast.jet</groupId>
-    <artifactId>hazelcast-beam-runner</artifactId>
+    <artifactId>hazelcast-jet-beam-runner</artifactId>
     <version>0.1-SNAPSHOT</version>
 
     <properties>
@@ -106,6 +106,12 @@
             <version>${hazelcast.jet.version}</version>
             <classifier>tests</classifier>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>javax.cache</groupId>
+            <artifactId>cache-api</artifactId>
+            <version>1.1.0</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>

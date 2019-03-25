@@ -50,11 +50,11 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         return new JetRunner(options, jetClientSupplier);
     }
 
-    private final JetRunnerOptions options;
+    private final JetPipelineOptions options;
     private final Function<ClientConfig, JetInstance> jetClientSupplier;
 
     private JetRunner(PipelineOptions options, Function<ClientConfig, JetInstance> jetClientSupplier) {
-        this.options = validate(options.as(JetRunnerOptions.class));
+        this.options = validate(options.as(JetPipelineOptions.class));
         this.jetClientSupplier = jetClientSupplier;
     }
 
@@ -107,13 +107,11 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         return result;
     }
 
-    private JetInstance getJetInstance(JetRunnerOptions options) {
+    private JetInstance getJetInstance(JetPipelineOptions options) {
         String jetGroupName = options.getJetGroupName();
-        String jetGroupPassword = options.getJetGroupPassword();
 
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.getGroupConfig().setName(jetGroupName);
-        clientConfig.getGroupConfig().setPassword(jetGroupPassword);
         return jetClientSupplier.apply(clientConfig);
     }
 
@@ -121,9 +119,8 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         return Collections.singletonList(JavaReadViaImpulse.boundedOverride());
     }
 
-    private static JetRunnerOptions validate(JetRunnerOptions options) {
+    private static JetPipelineOptions validate(JetPipelineOptions options) {
         if (options.getJetGroupName() == null) throw new IllegalArgumentException("Jet group NAME not set in options!");
-        if (options.getJetGroupPassword() == null) throw new IllegalArgumentException("Jet group PASSWORD not set in options!");
         return options;
     }
 

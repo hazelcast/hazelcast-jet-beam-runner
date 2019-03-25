@@ -19,12 +19,14 @@ package com.hazelcast.jet.beam.transforms;
 import com.hazelcast.config.EventJournalConfig;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.JetTestInstanceFactory;
+import com.hazelcast.jet.beam.JetPipelineOptions;
 import com.hazelcast.jet.beam.TestJetRunner;
 import com.hazelcast.jet.config.JetConfig;
+import org.apache.beam.sdk.options.PipelineOptions;
+import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.testing.TestPipeline;
 import org.apache.beam.sdk.transforms.SimpleFunction;
 import org.apache.beam.sdk.values.KV;
-import org.apache.beam.vendor.grpc.v1p13p1.com.google.gson.GsonBuilder;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
@@ -39,26 +41,20 @@ import java.util.Map;
 public abstract class AbstractTransformTest implements Serializable {
 
     @Rule
-    public transient Timeout globalTimeout = Timeout.seconds(1000); // 10 seconds max per method tested
+    public Timeout globalTimeout = Timeout.seconds(1000); // 10 seconds max per method tested
 
     @Rule
-    public transient TestPipeline pipeline = getTestPipeline();
+    public TestPipeline pipeline = getTestPipeline();
 
     private static TestPipeline getTestPipeline() {
-        System.setProperty(
-                TestPipeline.PROPERTY_BEAM_TEST_PIPELINE_OPTIONS,
-                new GsonBuilder().create().toJson(
-                        new String[]{
-                                "--runner=TestJetRunner",
-                                "--jetGroupName=" + JetConfig.DEFAULT_GROUP_NAME,
-                                "--jetGroupPassword="
-                        }
-                )
-        );
-        return TestPipeline.create();
+        PipelineOptions options = PipelineOptionsFactory.create();
+        options.as(JetPipelineOptions.class).setJetGroupName(JetConfig.DEFAULT_GROUP_NAME);
+        options.setRunner(TestJetRunner.class);
+        return TestPipeline.fromOptions(options);
     }
 
     private static JetTestInstanceFactory factory = new JetTestInstanceFactory();
+
     static {
         TestJetRunner.JET_CLIENT_SUPPLIER = factory::newClient;
     }
@@ -68,7 +64,6 @@ public abstract class AbstractTransformTest implements Serializable {
     @BeforeClass
     public static void beforeClass() {
         JetConfig config = new JetConfig();
-        config.getHazelcastConfig().setProperty("hazelcast.logging.type", "log4j");
         config.getHazelcastConfig().addEventJournalConfig(new EventJournalConfig().setMapName("map"));
         instance = factory.newMember(config);
 

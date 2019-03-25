@@ -28,7 +28,7 @@ public class JetTranslationContext {
     private final SerializablePipelineOptions options;
     private final DAGBuilder dagBuilder = new DAGBuilder();
 
-    JetTranslationContext(JetRunnerOptions options) {
+    JetTranslationContext(JetPipelineOptions options) {
         this.options = new SerializablePipelineOptions(options);
     }
 

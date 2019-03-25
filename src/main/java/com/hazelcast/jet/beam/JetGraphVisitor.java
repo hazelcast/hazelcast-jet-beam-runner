@@ -29,7 +29,7 @@ class JetGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
 
     private boolean finalized = false;
 
-    JetGraphVisitor(JetRunnerOptions options) {
+    JetGraphVisitor(JetPipelineOptions options) {
         this.translationContext = new JetTranslationContext(options);
     }
 

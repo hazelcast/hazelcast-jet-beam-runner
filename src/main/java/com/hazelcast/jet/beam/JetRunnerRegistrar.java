@@ -42,12 +42,12 @@ public final class JetRunnerRegistrar {
         }
     }
 
-    /** Registers the {@link JetRunnerOptions}. */
+    /** Registers the {@link JetPipelineOptions}. */
     @AutoService(PipelineOptionsRegistrar.class)
     public static class Options implements PipelineOptionsRegistrar {
         @Override
         public Iterable<Class<? extends PipelineOptions>> getPipelineOptions() {
-            return ImmutableList.of(JetRunnerOptions.class);
+            return ImmutableList.of(JetPipelineOptions.class);
         }
     }
 }
