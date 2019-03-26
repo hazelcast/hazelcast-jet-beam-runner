@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam;
 
+import org.apache.beam.runners.core.construction.PTransformTranslation;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.runners.TransformHierarchy;
 import org.apache.beam.sdk.transforms.PTransform;
@@ -36,7 +37,7 @@ class PrintFullGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
 
     @Override
     public CompositeBehavior enterCompositeTransform(TransformHierarchy.Node node) {
-        printNode(node, " ENTER COMPOSITE");
+        printNode(node, " COMPOSITE");
         depth++;
         return super.enterCompositeTransform(node);
     }
@@ -44,7 +45,7 @@ class PrintFullGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
     @Override
     public void leaveCompositeTransform(TransformHierarchy.Node node) {
         --depth;
-        printNode(node, " EXIT COMPOSITE");
+        sb.append("\n").append(genTabs(2 * depth)).append(depth).append(" -- END OF COMPOSITE");
         super.leaveCompositeTransform(node);
     }
 
@@ -55,10 +56,13 @@ class PrintFullGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
 
     private void printNode(TransformHierarchy.Node node, String prefix) {
         String indent = genTabs(2 * depth);
-        sb.append("\n\n").append(indent).append(depth).append(prefix).append(" Node: ").append(node.getFullName()).append("@").append(System.identityHashCode(node));
+        sb.append("\n\n").append(indent).append(depth).append(prefix).append(" Node: ").append(node.getFullName())
+          .append("@").append(Integer.toHexString(System.identityHashCode(node)));
 
         PTransform<?, ?> transform = node.getTransform();
         sb.append("\n\t").append(indent).append("Transform: ").append(transform);
+        String urn = transform != null ? PTransformTranslation.urnForTransformOrNull(transform) : null;
+        sb.append("\n\t").append(indent).append("URN: ").append(urn);
 
         Map<TupleTag<?>, PValue> additionalInputs = Utils.getAdditionalInputs(node);
         if (additionalInputs != null && !additionalInputs.isEmpty()) {

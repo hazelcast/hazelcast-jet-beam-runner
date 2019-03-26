@@ -64,6 +64,10 @@ class PrintGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
     }
 
     static void printValues(Collection<PValue> values, String indent, StringBuilder sb) {
+        if (values == null) {
+            sb.append("null");
+            return;
+        }
         for (PValue value : values) {
             sb.append("\n\t\t").append(indent).append(value.getName()).append(" (").append(Utils.getTupleTag(value)).append(")");
         }

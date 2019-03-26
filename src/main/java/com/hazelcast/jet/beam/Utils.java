@@ -47,6 +47,9 @@ public class Utils {
     }
 
     static Collection<PValue> getMainInputs(Pipeline pipeline, TransformHierarchy.Node node) {
+        if (node.getTransform() == null) {
+            return null;
+        }
         return TransformInputs.nonAdditionalInputs(node.toAppliedPTransform(pipeline));
     }
 
@@ -55,14 +58,20 @@ public class Utils {
     }
 
     static Map<TupleTag<?>, PValue> getAdditionalInputs(TransformHierarchy.Node node) {
-        return node.getTransform().getAdditionalInputs();
+        return node.getTransform() != null ? node.getTransform().getAdditionalInputs() : null;
     }
 
     static <T extends PValue> T getInput(AppliedPTransform<?, ?, ?> appliedTransform) {
+        if (appliedTransform.getTransform() == null) {
+            return null;
+        }
         return (T) Iterables.getOnlyElement(TransformInputs.nonAdditionalInputs(appliedTransform));
     }
 
     static Map<TupleTag<?>, PValue> getOutputs(AppliedPTransform<?, ?, ?> appliedTransform) {
+        if (appliedTransform.getTransform() == null) {
+            return null;
+        }
         return appliedTransform.getOutputs();
     }
 
