@@ -376,7 +376,6 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
         void buffer(WindowedValue<InputT> item) {
             bufferedItems.add(item);
-            System.err.println("### bufferedItems = " + bufferedItems.size()); //todo: remove
         }
 
         List<WindowedValue<InputT>> flush(PCollectionView<?> view) {
@@ -387,7 +386,6 @@ public class ParDoP<InputT, OutputT> implements Processor {
                 if (missingViews.isEmpty()) {
                     List<WindowedValue<InputT>> flushedItems = bufferedItems;
                     bufferedItems = new ArrayList<>();
-                    System.err.println("### flushedItems = " + flushedItems.size()); //todo: remove
                     return flushedItems;
                 } else {
                     return Collections.emptyList();
