@@ -49,6 +49,7 @@ import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -180,8 +181,10 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
     private boolean processSideInput(SideInputValue sideInput, boolean bundleStarted) {
         PCollectionView<?> view = sideInput.getView();
-        WindowedValue<Iterable<?>> value = sideInput.getWindowedValue();
-        sideInputHandler.addSideInputValue(view, value);
+        Collection<WindowedValue<Iterable<?>>> windowedValues = sideInput.getWindowedValues();
+        for (WindowedValue<Iterable<?>> value : windowedValues) {
+            sideInputHandler.addSideInputValue(view, value);
+        }
 
         if (bufferingTracker != null) {
             List<WindowedValue<InputT>> items = bufferingTracker.flush(view);

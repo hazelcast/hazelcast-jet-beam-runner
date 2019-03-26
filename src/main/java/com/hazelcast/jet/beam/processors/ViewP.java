@@ -32,10 +32,12 @@ import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Collects all input {@link WindowedValue}s, groups them by windows and when
@@ -78,25 +80,22 @@ public class ViewP extends AbstractProcessor {
     public boolean complete() {
         //System.out.println(ViewP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         if (resultTraverser == null) {
-            resultTraverser =
-                    values.isEmpty() ?
-                            Traversers.singleton(
-                                    new SideInputValue(
-                                            view,
-                                            WindowedValue.timestampedValueInGlobalWindow(null, Instant.now())
-                                    )
-                            ) :
-                            Traversers.traverseStream(
-                                    values.entrySet().stream()
-                                            .map(
-                                                    e -> {
-                                                        BoundedWindow window = e.getKey();
-                                                        TimestampAndValues value = e.getValue();
-                                                        return new SideInputValue(view,
-                                                                WindowedValue.of(value.values, value.timestamp, Collections.singleton(window), paneInfo));
-                                                    }
-                                            )
-                            );
+
+            Collection windowedValues;
+            if (values.isEmpty()) {
+                windowedValues = Collections.singletonList(WindowedValue.timestampedValueInGlobalWindow(null, Instant.now()));
+            } else {
+                windowedValues = values.entrySet().stream()
+                        .map(
+                                e -> {
+                                    BoundedWindow window = e.getKey();
+                                    TimestampAndValues value = e.getValue();
+                                    return WindowedValue.of(value.getValues(), value.timestamp, Collections.singleton(window), paneInfo);
+                                }
+                        )
+                        .collect(Collectors.toList());
+            }
+            resultTraverser = Traversers.singleton(new SideInputValue(view, windowedValues));
         }
         return emitFromTraverser(resultTraverser);
     }
@@ -105,13 +104,17 @@ public class ViewP extends AbstractProcessor {
         return () -> new ViewP(view, windowingStrategy, ownerId);
     }
 
-    private static class TimestampAndValues {
-        private Instant timestamp;
+    public static class TimestampAndValues {
         private final List<Object> values = new ArrayList<>();
+        private Instant timestamp;
 
         TimestampAndValues(Instant timestamp, Object value) {
             this.timestamp = timestamp;
             values.add(value);
+        }
+
+        public Iterable<Object> getValues() {
+            return values;
         }
 
         TimestampAndValues merge(TimestampCombiner timestampCombiner, TimestampAndValues v2) {

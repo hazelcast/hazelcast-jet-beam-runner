@@ -19,26 +19,28 @@ package com.hazelcast.jet.beam;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.PCollectionView;
 
+import java.util.Collection;
+
 public class SideInputValue {
 
     private final PCollectionView<?> view;
-    private final WindowedValue<Iterable<?>> windowedValue;
+    private final Collection<WindowedValue<Iterable<?>>> windowedValues;
 
-    public SideInputValue(PCollectionView view, WindowedValue<Iterable<?>> windowedValue) {
+    public SideInputValue(PCollectionView view, Collection<WindowedValue<Iterable<?>>> windowedValues) {
         this.view = view;
-        this.windowedValue = windowedValue;
+        this.windowedValues = windowedValues;
     }
 
     public PCollectionView<?> getView() {
         return view;
     }
 
-    public WindowedValue<Iterable<?>> getWindowedValue() {
-        return windowedValue;
+    public Collection<WindowedValue<Iterable<?>>> getWindowedValues() {
+        return windowedValues;
     }
 
     @Override
     public String toString() {
-        return "SideInputValue (" + windowedValue + ")" ;
+        return "SideInputValue (" + windowedValues + ")" ;
     }
 }
