@@ -199,7 +199,6 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
-                    <runOrder>failedfirst</runOrder>
                     <failIfNoTests>false</failIfNoTests>
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>
