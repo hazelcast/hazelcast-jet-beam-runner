@@ -18,6 +18,7 @@ package com.hazelcast.jet.beam;
 
 import com.hazelcast.jet.beam.processors.AssignWindowP;
 import com.hazelcast.jet.beam.processors.BoundedSourceP;
+import com.hazelcast.jet.beam.processors.FlattenP;
 import com.hazelcast.jet.beam.processors.ImpulseP;
 import com.hazelcast.jet.beam.processors.ParDoP;
 import com.hazelcast.jet.beam.processors.ViewP;
@@ -25,8 +26,6 @@ import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.Vertex;
-import com.hazelcast.jet.core.processor.Processors;
-import com.hazelcast.jet.function.FunctionEx;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.runners.core.construction.CreatePCollectionViewTranslation;
 import org.apache.beam.runners.core.construction.PTransformTranslation;
@@ -300,10 +299,10 @@ class JetTransformTranslators {
         @Override
         public void translate(Pipeline pipeline, TransformHierarchy.Node node, JetTranslationContext context) {
             AppliedPTransform<?, ?, ?> appliedTransform = node.toAppliedPTransform(pipeline);
-            SupplierEx<Processor> processorSupplier = Processors.mapP(FunctionEx.identity());
 
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(appliedTransform.getFullName());
+            SupplierEx<Processor> processorSupplier = FlattenP.supplier(vertexId);
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
