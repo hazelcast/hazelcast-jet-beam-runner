@@ -25,7 +25,7 @@ public class ImpulseP extends AbstractProcessor {
 
     private final String ownerId; //do not remove it, very useful for debugging
 
-    public ImpulseP(String ownerId) {
+    private ImpulseP(String ownerId) {
         this.ownerId = ownerId;
     }
 

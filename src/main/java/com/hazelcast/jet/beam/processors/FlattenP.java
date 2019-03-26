@@ -29,10 +29,12 @@ public class FlattenP extends AbstractProcessor {
 
     private FlattenP(String ownerId) {
         this.ownerId = ownerId;
+        //System.out.println(FlattenP.class.getSimpleName() + " CREATE, ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
+        //System.out.println(FlattenP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
         return tryEmit(item);
     }
 

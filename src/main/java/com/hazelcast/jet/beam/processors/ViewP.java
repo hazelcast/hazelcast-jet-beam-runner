@@ -56,10 +56,12 @@ public class ViewP extends AbstractProcessor {
         this.timestampCombiner = windowingStrategy.getTimestampCombiner();
         this.view = view;
         this.ownerId = ownerId;
+        //System.out.println(ViewP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
+        //System.out.println(ViewP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
         WindowedValue<?> windowedValue = (WindowedValue<?>) item;
         for (BoundedWindow window : windowedValue.getWindows()) {
             values
@@ -74,6 +76,7 @@ public class ViewP extends AbstractProcessor {
 
     @Override
     public boolean complete() {
+        //System.out.println(ViewP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         if (resultTraverser == null) {
             resultTraverser = Traversers.traverseStream(
                     values.entrySet().stream()

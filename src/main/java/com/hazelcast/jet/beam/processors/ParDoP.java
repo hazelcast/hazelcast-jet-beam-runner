@@ -126,6 +126,8 @@ public class ParDoP<InputT, OutputT> implements Processor {
                 outputCoderMap,
                 windowingStrategy
         );
+        //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
+        //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
@@ -149,6 +151,8 @@ public class ParDoP<InputT, OutputT> implements Processor {
         }
         doFnRunner.startBundle();
         for (Object item; (item = inbox.peek()) != null; ) {
+            //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
+            //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
             if (item instanceof SideInputValue) {
                 SideInputValue sideInput = (SideInputValue) item;
                 PCollectionView<?> sideInputView = sideInput.getView();
@@ -175,6 +179,8 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
     @Override
     public boolean complete() {
+        //System.out.println(ParDoP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
+        //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         return outputManager.tryFlush();
     }
 

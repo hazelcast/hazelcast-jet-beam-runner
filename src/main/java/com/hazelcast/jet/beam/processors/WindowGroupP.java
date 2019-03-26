@@ -52,11 +52,13 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
     private WindowGroupP(WindowingStrategy<T, BoundedWindow> windowingStrategy, String ownerId) {
         this.windowingStrategy = windowingStrategy;
         this.ownerId = ownerId;
+        System.out.println(WindowGroupP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
     @SuppressWarnings("unchecked")
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
+        //System.out.println(WindowGroupP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
         assert ordinal == 0;
         WindowedValue<KV<K, T>> windowedValue = (WindowedValue) item;
         K key = windowedValue.getValue().getKey();
@@ -72,6 +74,7 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
 
     @Override
     public boolean complete() {
+        //System.out.println(WindowGroupP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         if (resultTraverser == null) {
             ResettableMergeContext mergeContext = new ResettableMergeContext<>(windowingStrategy.getWindowFn());
             resultTraverser = traverseStream(keyToWindowToList.entrySet().stream())
