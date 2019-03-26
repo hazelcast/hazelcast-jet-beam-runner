@@ -1268,7 +1268,6 @@ public class ViewTest extends AbstractTransformTest {
     @Test
     @Category(ValidatesRunner.class)
     public void testWindowedSideInputFixedToFixedWithDefault() {
-
         final PCollectionView<Integer> view =
                 pipeline
                         .apply(

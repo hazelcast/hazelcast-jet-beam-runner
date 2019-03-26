@@ -106,20 +106,19 @@ public class DAGBuilder {
                 if (sourceVertex == null) throw new RuntimeException("Oops!");
 
                 List<Vertex> destinationVertices = edgeEndPoints.getOrDefault(edgeId, Collections.emptyList());
-                boolean highPriorityEdge = edgeId.toString().contains("PCollectionView"); //todo: this is a hack!
                 for (Vertex destinationVertex : destinationVertices) {
-                    addEdge(sourceVertex, destinationVertex, pCollId, highPriorityEdge);
+                    addEdge(sourceVertex, destinationVertex, pCollId);
                 }
             }
         }
 
-        private void addEdge(Vertex sourceVertex, Vertex destinationVertex, TupleTag pCollId, boolean highPriority) {
+        private void addEdge(Vertex sourceVertex, Vertex destinationVertex, TupleTag pCollId) {
             //todo: set up the edges properly, including other aspects too, like parallelism
 
             try {
                 Edge edge = Edge
                         .from(sourceVertex, getNextFreeOrdinal(sourceVertex, false))
-                        .to(destinationVertex, getNextFreeOrdinal(destinationVertex, true)).priority(highPriority ? 1 : 2);
+                        .to(destinationVertex, getNextFreeOrdinal(destinationVertex, true));
                 dag.edge(edge);
 
                 String sourceVertexName = sourceVertex.getName();

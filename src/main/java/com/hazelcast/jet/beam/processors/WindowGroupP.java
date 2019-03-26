@@ -52,7 +52,7 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
     private WindowGroupP(WindowingStrategy<T, BoundedWindow> windowingStrategy, String ownerId) {
         this.windowingStrategy = windowingStrategy;
         this.ownerId = ownerId;
-        System.out.println(WindowGroupP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
+        //System.out.println(WindowGroupP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
     @Override

@@ -78,17 +78,25 @@ public class ViewP extends AbstractProcessor {
     public boolean complete() {
         //System.out.println(ViewP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         if (resultTraverser == null) {
-            resultTraverser = Traversers.traverseStream(
-                    values.entrySet().stream()
-                    .map(
-                            e -> {
-                                BoundedWindow window = e.getKey();
-                                TimestampAndValues value = e.getValue();
-                                return new SideInputValue(view,
-                                        WindowedValue.of(value.values, value.timestamp, Collections.singleton(window), paneInfo));
-                            }
-                    )
-            );
+            resultTraverser =
+                    values.isEmpty() ?
+                            Traversers.singleton(
+                                    new SideInputValue(
+                                            view,
+                                            WindowedValue.timestampedValueInGlobalWindow(null, Instant.now())
+                                    )
+                            ) :
+                            Traversers.traverseStream(
+                                    values.entrySet().stream()
+                                            .map(
+                                                    e -> {
+                                                        BoundedWindow window = e.getKey();
+                                                        TimestampAndValues value = e.getValue();
+                                                        return new SideInputValue(view,
+                                                                WindowedValue.of(value.values, value.timestamp, Collections.singleton(window), paneInfo));
+                                                    }
+                                            )
+                            );
         }
         return emitFromTraverser(resultTraverser);
     }

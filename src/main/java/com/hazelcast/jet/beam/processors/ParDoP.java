@@ -49,6 +49,8 @@ import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -74,6 +76,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
     private DoFnRunner<InputT, OutputT> doFnRunner;
     private JetOutputManager outputManager;
     private JetMetricsContainer metricsContainer;
+    private BufferingTracker bufferingTracker;
 
     private ParDoP(
             DoFn<InputT, OutputT> doFn,
@@ -106,11 +109,13 @@ public class ParDoP<InputT, OutputT> implements Processor {
         doFnInvoker.invokeSetup();
 
         SideInputReader sideInputReader;
-        if (!sideInputs.isEmpty()) {
-            sideInputHandler = new SideInputHandler(sideInputs, InMemoryStateInternals.forKey(null));
-            sideInputReader = sideInputHandler;
-        } else {
+        if (sideInputs.isEmpty()) {
+            bufferingTracker = null;
             sideInputReader = NullSideInputReader.of(sideInputs);
+        } else {
+            sideInputHandler = new SideInputHandler(sideInputs, InMemoryStateInternals.forKey(null));
+            bufferingTracker = new BufferingTracker(sideInputs);
+            sideInputReader = sideInputHandler;
         }
 
         outputManager = new JetOutputManager(outbox, outputCollToOrdinals);
@@ -149,27 +154,64 @@ public class ParDoP<InputT, OutputT> implements Processor {
             // don't process more items until outputManager is empty
             return;
         }
-        doFnRunner.startBundle();
+        boolean bundleStarted = false;
         for (Object item; (item = inbox.peek()) != null; ) {
             //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
             //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
             if (item instanceof SideInputValue) {
-                SideInputValue sideInput = (SideInputValue) item;
-                PCollectionView<?> sideInputView = sideInput.getView();
-                WindowedValue<Iterable<?>> sideInputValue = sideInput.getWindowedValue();
-                sideInputHandler.addSideInputValue(sideInputView, sideInputValue);
+                bundleStarted = processSideInput((SideInputValue) item, bundleStarted) || bundleStarted;
             } else {
-                //noinspection unchecked
-                WindowedValue<InputT> windowedValue = (WindowedValue<InputT>) item;
-                doFnRunner.processElement(windowedValue);
+                if (bufferingTracker != null) {
+                    bundleStarted = processBufferedRegularItem((WindowedValue<InputT>) item, bundleStarted) || bundleStarted;
+                } else {
+                    bundleStarted = processNonBufferedRegularItem((WindowedValue<InputT>) item, bundleStarted) || bundleStarted;
+                }
             }
             inbox.remove();
             if (!outputManager.tryFlush()) {
                 break;
             }
         }
-        doFnRunner.finishBundle();
+        if (bundleStarted) {
+            doFnRunner.finishBundle();
+        }
         // finishBundle can also add items to outputManager, they will be flushed in tryProcess() or complete()
+    }
+
+    private boolean processSideInput(SideInputValue sideInput, boolean bundleStarted) {
+        PCollectionView<?> view = sideInput.getView();
+        WindowedValue<Iterable<?>> value = sideInput.getWindowedValue();
+        sideInputHandler.addSideInputValue(view, value);
+
+        if (bufferingTracker != null) {
+            List<WindowedValue<InputT>> items = bufferingTracker.flush(view);
+            for (WindowedValue<InputT> item : items) {
+                bundleStarted = processNonBufferedRegularItem(item, bundleStarted) || bundleStarted;
+            }
+        }
+        return bundleStarted;
+    }
+
+    private boolean processNonBufferedRegularItem(WindowedValue<InputT> item, boolean bundleStarted) {
+        if (!bundleStarted) {
+            doFnRunner.startBundle();
+            bundleStarted = true;
+        }
+
+        WindowedValue<InputT> windowedValue = item;
+        doFnRunner.processElement(windowedValue);
+
+        return bundleStarted;
+    }
+
+    private boolean processBufferedRegularItem(WindowedValue<InputT> item, boolean bundleStarted) {
+        boolean bufferingNeeded = bufferingTracker.isBufferingNeeded(); //todo
+        if (bufferingNeeded) {
+            bufferingTracker.buffer(item);
+        } else {
+            bundleStarted = processNonBufferedRegularItem(item, bundleStarted) || bundleStarted;
+        }
+        return bundleStarted;
     }
 
     @Override
@@ -250,7 +292,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
         }
     }
 
-    public static class Supplier<InputT, OutputT>  implements SupplierEx<Processor>, DAGBuilder.WiringListener {
+    public static class Supplier<InputT, OutputT> implements SupplierEx<Processor>, DAGBuilder.WiringListener {
 
         private final String ownerId;
 
@@ -313,6 +355,42 @@ public class ParDoP<InputT, OutputT> implements Processor {
         @Override
         public void isInboundEdgeOfVertex(Edge edge, TupleTag pCollId, String vertexId) {
             //do nothing
+        }
+    }
+
+    private class BufferingTracker {
+
+        private final Set<PCollectionView<?>> missingViews;
+        private List<WindowedValue<InputT>> bufferedItems = new ArrayList<>();
+
+        BufferingTracker(List<PCollectionView<?>> sideInputs) {
+            this.missingViews = new HashSet<>(sideInputs);
+        }
+
+        boolean isBufferingNeeded() {
+            return !missingViews.isEmpty();
+        }
+
+        void buffer(WindowedValue<InputT> item) {
+            bufferedItems.add(item);
+            System.err.println("### bufferedItems = " + bufferedItems.size()); //todo: remove
+        }
+
+        List<WindowedValue<InputT>> flush(PCollectionView<?> view) {
+            if (missingViews.isEmpty()) {
+                return Collections.emptyList();
+            } else {
+                missingViews.remove(view);
+                if (missingViews.isEmpty()) {
+                    List<WindowedValue<InputT>> flushedItems = bufferedItems;
+                    bufferedItems = new ArrayList<>();
+                    System.err.println("### flushedItems = " + flushedItems.size()); //todo: remove
+                    return flushedItems;
+                } else {
+                    return Collections.emptyList();
+                }
+            }
+
         }
     }
 }
