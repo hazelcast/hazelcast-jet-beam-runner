@@ -18,28 +18,22 @@ package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
-import com.hazelcast.jet.core.ResettableSingletonTraverser;
 import com.hazelcast.jet.function.SupplierEx;
+
+import javax.annotation.Nonnull;
 
 public class FlattenP extends AbstractProcessor {
 
-    private final ResettableSingletonTraverser<Object> traverser = new ResettableSingletonTraverser<>();
-    private final FlatMapper<Object, Object> flatMapper;
-    private final String ownerId; //do not remove, useful for debugging
+    @SuppressWarnings("FieldCanBeLocal") //do not remove, useful for debugging
+    private final String ownerId;
 
-    FlattenP(String ownerId) {
+    private FlattenP(String ownerId) {
         this.ownerId = ownerId;
-        this.flatMapper = flatMapper(
-                item -> {
-                    traverser.accept(item);
-                    return traverser;
-                }
-        );
     }
 
     @Override
-    protected boolean tryProcess(int ordinal, Object item) {
-        return flatMapper.tryProcess(item);
+    protected boolean tryProcess(int ordinal, @Nonnull Object item) {
+        return tryEmit(item);
     }
 
     public static SupplierEx<Processor> supplier(String ownerId) {
