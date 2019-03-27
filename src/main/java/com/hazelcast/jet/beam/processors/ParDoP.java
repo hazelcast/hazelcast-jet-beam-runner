@@ -160,12 +160,12 @@ public class ParDoP<InputT, OutputT> implements Processor {
             //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
             //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
             if (item instanceof SideInputValue) {
-                bundleStarted = processSideInput((SideInputValue) item, bundleStarted) || bundleStarted;
+                bundleStarted |= processSideInput((SideInputValue) item, bundleStarted);
             } else {
                 if (bufferingTracker != null) {
-                    bundleStarted = processBufferedRegularItem((WindowedValue<InputT>) item, bundleStarted) || bundleStarted;
+                    bundleStarted |= processBufferedRegularItem((WindowedValue<InputT>) item, bundleStarted);
                 } else {
-                    bundleStarted = processNonBufferedRegularItem((WindowedValue<InputT>) item, bundleStarted) || bundleStarted;
+                    bundleStarted |= processNonBufferedRegularItem((WindowedValue<InputT>) item, bundleStarted);
                 }
             }
             inbox.remove();
@@ -189,7 +189,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
         if (bufferingTracker != null) {
             List<WindowedValue<InputT>> items = bufferingTracker.flush(view);
             for (WindowedValue<InputT> item : items) {
-                bundleStarted = processNonBufferedRegularItem(item, bundleStarted) || bundleStarted;
+                bundleStarted |= processNonBufferedRegularItem(item, bundleStarted);
             }
         }
         return bundleStarted;
@@ -212,7 +212,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
         if (bufferingNeeded) {
             bufferingTracker.buffer(item);
         } else {
-            bundleStarted = processNonBufferedRegularItem(item, bundleStarted) || bundleStarted;
+            bundleStarted |= processNonBufferedRegularItem(item, bundleStarted);
         }
         return bundleStarted;
     }
