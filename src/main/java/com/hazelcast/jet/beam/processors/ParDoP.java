@@ -59,6 +59,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.hazelcast.jet.beam.Utils.serde;
+
 public class ParDoP<InputT, OutputT> implements Processor {
 
     private final SerializablePipelineOptions pipelineOptions;
@@ -333,7 +335,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
         @Override
         public Processor getEx() {
             return new ParDoP<>(
-                    doFn,
+                    serde(doFn),
                     windowingStrategy,
                     outputCollToOrdinals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().stream().mapToInt(i -> i).toArray())),
                     pipelineOptions,

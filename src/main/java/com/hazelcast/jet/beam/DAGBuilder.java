@@ -21,7 +21,10 @@ import com.hazelcast.jet.core.Edge;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.Vertex;
+import com.hazelcast.jet.function.FunctionEx;
 import com.hazelcast.jet.function.SupplierEx;
+import org.apache.beam.sdk.util.WindowedValue;
+import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.TupleTag;
 
 import java.util.ArrayList;
@@ -33,6 +36,17 @@ import java.util.List;
 import java.util.Map;
 
 public class DAGBuilder {
+
+    private static final FunctionEx<Object, Object> PARTITION_KEY_EXTRACTOR = t -> {
+        Object key = null;
+        if (t instanceof WindowedValue) {
+            t = ((WindowedValue) t).getValue();
+        }
+        if (t instanceof KV) {
+            key = ((KV) t).getKey();
+        }
+        return key == null ? "all" : key;
+    };
 
     private final DAG dag = new DAG();
 
@@ -80,7 +94,7 @@ public class DAGBuilder {
     Vertex addVertex(String id, SupplierEx<Processor> processor) {
         return dag
                 .newVertex(id, processor)
-                .localParallelism(1) //todo: quick and dirty hack for now, can't leave it like this
+                .localParallelism(2) //todo: quick and dirty hack for now, can't leave it like this
                 ;
     }
 
@@ -106,19 +120,26 @@ public class DAGBuilder {
                 if (sourceVertex == null) throw new RuntimeException("Oops!");
 
                 List<Vertex> destinationVertices = edgeEndPoints.getOrDefault(edgeId, Collections.emptyList());
+                boolean sideInputEdge = edgeId.toString().contains("PCollectionView"); //todo: this is a hack!
                 for (Vertex destinationVertex : destinationVertices) {
-                    addEdge(sourceVertex, destinationVertex, pCollId);
+                    addEdge(sourceVertex, destinationVertex, pCollId, sideInputEdge);
                 }
             }
         }
 
-        private void addEdge(Vertex sourceVertex, Vertex destinationVertex, TupleTag pCollId) {
+        private void addEdge(Vertex sourceVertex, Vertex destinationVertex, TupleTag pCollId, boolean sideInputEdge) {
             //todo: set up the edges properly, including other aspects too, like parallelism
 
             try {
                 Edge edge = Edge
                         .from(sourceVertex, getNextFreeOrdinal(sourceVertex, false))
-                        .to(destinationVertex, getNextFreeOrdinal(destinationVertex, true));
+                        .to(destinationVertex, getNextFreeOrdinal(destinationVertex, true))
+                        .distributed();
+                if (sideInputEdge) {
+                    edge = edge.broadcast();
+                } else {
+                    edge = edge.partitioned(PARTITION_KEY_EXTRACTOR); // todo: we likely don't need to partition everything
+                }
                 dag.edge(edge);
 
                 String sourceVertexName = sourceVertex.getName();

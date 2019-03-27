@@ -29,6 +29,10 @@ import org.apache.beam.sdk.values.PValue;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Iterables;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -124,5 +128,24 @@ public class Utils {
                         .filter(i -> i % count == index)
                         .mapToObj(list::get)
                         .collect(toList());
+    }
+
+    /**
+     * Returns a deep clone of an object by serializing and deserializing it
+     * (ser-de).
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T serde(T object) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ObjectOutputStream oos = new ObjectOutputStream(baos);
+            oos.writeObject(object);
+            oos.close();
+            byte[] byteData = baos.toByteArray();
+            ByteArrayInputStream bais = new ByteArrayInputStream(byteData);
+            return (T) new ObjectInputStream(bais).readObject();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }
