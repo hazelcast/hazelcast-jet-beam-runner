@@ -50,7 +50,6 @@ import org.apache.beam.sdk.values.PValue;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
-import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Maps;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -153,7 +152,6 @@ class JetTransformTranslators {
                 throw new RuntimeException(e);
             }
             Map<TupleTag<?>, Integer> outputMap = new HashMap<>();
-            outputMap.put(mainOutputTag, 0);
             int count = 1;
             for (TupleTag<?> tag : outputs.keySet()) {
                 if (!outputMap.containsKey(tag)) {
@@ -161,18 +159,12 @@ class JetTransformTranslators {
                 }
             }
 
-            // Union coder elements must match the order of the output tags.
-            Map<Integer, TupleTag<?>> indexMap = Maps.newTreeMap();
-            for (Map.Entry<TupleTag<?>, Integer> entry : outputMap.entrySet()) {
-                indexMap.put(entry.getValue(), entry.getKey());
-            }
-
             // assume that the windowing strategy is the same for all outputs
             final WindowingStrategy<?, ?>[] windowingStrategy = new WindowingStrategy[1]; //todo: the array is an ugly hack
 
             // collect all output Coders and create a UnionCoder for our tagged outputs
             List<Coder<?>> outputCoders = Lists.newArrayList();
-            for (TupleTag<?> tag : indexMap.values()) {
+            for (TupleTag<?> tag : outputs.keySet()) {
                 PValue taggedValue = outputs.get(tag);
                 checkState(
                         taggedValue instanceof PCollection,
