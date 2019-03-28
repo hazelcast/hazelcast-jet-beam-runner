@@ -31,7 +31,7 @@ public interface JetPipelineOptions extends PipelineOptions {
     @Description("Local parallelism of Jet nodes")
     @Validation.Required
     @Default.Integer(-1)
-    Integer getJetLocalParalellism();
-    void setJetLocalParalellism(Integer localParalellism);
+    Integer getJetLocalParallelism();
+    void setJetLocalParallelism(Integer localParallelism);
 
 }

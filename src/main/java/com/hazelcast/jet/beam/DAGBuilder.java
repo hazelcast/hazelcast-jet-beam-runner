@@ -60,7 +60,7 @@ public class DAGBuilder {
     private int vertexId = 0;
 
     DAGBuilder(JetPipelineOptions options) {
-        this.localParallelism = options.getJetLocalParalellism();
+        this.localParallelism = options.getJetLocalParallelism();
     }
 
     DAG getDag() {
