@@ -27,7 +27,4 @@ public interface JetPipelineOptions extends PipelineOptions {
     String getJetGroupName();
     void setJetGroupName(String jetGroupName);
 
-    //todo: I guess more params are require
-    //todo: would be nicer to directly pass in the JetInstance, but I can't find a way to get that through the Beam config mechanisms
-
 }

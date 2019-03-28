@@ -23,10 +23,8 @@ import com.hazelcast.jet.beam.processors.ImpulseP;
 import com.hazelcast.jet.beam.processors.ParDoP;
 import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
-import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.Vertex;
-import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.runners.core.construction.CreatePCollectionViewTranslation;
 import org.apache.beam.runners.core.construction.PTransformTranslation;
 import org.apache.beam.runners.core.construction.ParDoTranslation;
@@ -207,7 +205,7 @@ class JetTransformTranslators {
                     sideInputs
             );
 
-            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
+            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier, true);
             dagBuilder.registerConstructionListeners(processorSupplier);
 
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
@@ -247,7 +245,7 @@ class JetTransformTranslators {
 
                 DAGBuilder dagBuilder = context.getDagBuilder();
                 String vertexId = dagBuilder.newVertexId(transformName);
-                Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(input.getWindowingStrategy(), vertexId));
+                Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(input.getWindowingStrategy(), vertexId), true);
 
                 dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
@@ -279,13 +277,13 @@ class JetTransformTranslators {
             String vertexId = dagBuilder.newVertexId(transformName);
             PCollection<T> input = Utils.getInput(appliedTransform);
 
-            Vertex vertex = dagBuilder.addVertex(vertexId, ViewP.supplier(view, input.getWindowingStrategy(), vertexId));
+            Vertex vertex = dagBuilder.addVertex(vertexId, ViewP.supplier(view, input.getWindowingStrategy(), vertexId), false);
 
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
 
             TupleTag<?> viewTag = Utils.getTupleTag(view);
-            dagBuilder.registerCollectionOfEdge(viewTag, view.getTagInternal()); //todo (NEXT): getTagInternal() is just something I picked at random!
-            dagBuilder.registerEdgeStartPoint(viewTag, vertex); //todo: view out edges should most likely be of broadcast type
+            dagBuilder.registerCollectionOfEdge(viewTag, view.getTagInternal());
+            dagBuilder.registerEdgeStartPoint(viewTag, vertex);
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
@@ -302,8 +300,7 @@ class JetTransformTranslators {
 
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(appliedTransform.getFullName());
-            SupplierEx<Processor> processorSupplier = FlattenP.supplier(vertexId);
-            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
+            Vertex vertex = dagBuilder.addVertex(vertexId, FlattenP.supplier(vertexId), true);
 
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
             for (PValue value : mainInputs) {
@@ -329,9 +326,8 @@ class JetTransformTranslators {
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
-            SupplierEx<Processor> processorSupplier = AssignWindowP.supplier(windowingStrategy, vertexId);
 
-            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
+            Vertex vertex = dagBuilder.addVertex(vertexId, AssignWindowP.supplier(windowingStrategy, vertexId), true);
 
             PCollection<WindowedValue> input = Utils.getInput(appliedTransform);
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
@@ -351,9 +347,8 @@ class JetTransformTranslators {
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
-            SupplierEx<Processor> processorSupplier = ImpulseP.supplier(vertexId);
 
-            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
+            Vertex vertex = dagBuilder.addVertex(vertexId, ImpulseP.supplier(vertexId), true);
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());

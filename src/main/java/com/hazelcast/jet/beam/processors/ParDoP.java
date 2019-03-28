@@ -210,7 +210,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
     }
 
     private boolean processBufferedRegularItem(WindowedValue<InputT> item, boolean bundleStarted) {
-        boolean bufferingNeeded = bufferingTracker.isBufferingNeeded(); //todo
+        boolean bufferingNeeded = bufferingTracker.isBufferingNeeded();
         if (bufferingNeeded) {
             bufferingTracker.buffer(item);
         } else {

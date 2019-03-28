@@ -81,20 +81,15 @@ public class ViewP extends AbstractProcessor {
         //System.out.println(ViewP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         if (resultTraverser == null) {
 
-            Collection windowedValues;
-            if (values.isEmpty()) {
-                windowedValues = Collections.singletonList(WindowedValue.timestampedValueInGlobalWindow(null, Instant.now()));
-            } else {
-                windowedValues = values.entrySet().stream()
-                        .map(
-                                e -> {
-                                    BoundedWindow window = e.getKey();
-                                    TimestampAndValues value = e.getValue();
-                                    return WindowedValue.of(value.getValues(), value.timestamp, Collections.singleton(window), paneInfo);
-                                }
-                        )
-                        .collect(Collectors.toList());
-            }
+            Collection windowedValues = values.entrySet().stream()
+                    .map(
+                            e -> {
+                                BoundedWindow window = e.getKey();
+                                TimestampAndValues value = e.getValue();
+                                return WindowedValue.of(value.getValues(), value.timestamp, Collections.singleton(window), paneInfo);
+                            }
+                    )
+                    .collect(Collectors.toList());
             resultTraverser = Traversers.singleton(new SideInputValue(view, windowedValues));
         }
         return emitFromTraverser(resultTraverser);
