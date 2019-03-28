@@ -18,6 +18,7 @@ package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.beam.DAGBuilder;
 import com.hazelcast.jet.beam.SideInputValue;
+import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.beam.metrics.JetMetricsContainer;
 import com.hazelcast.jet.core.Edge;
 import com.hazelcast.jet.core.Inbox;
@@ -47,10 +48,11 @@ import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.BitSet;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +73,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
     private final Coder<InputT> inputCoder;
     private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
     private final List<PCollectionView<?>> sideInputs;
+    private final BitSet sideInputOrdinals;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
 
@@ -79,7 +82,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
     private DoFnRunner<InputT, OutputT> doFnRunner;
     private JetOutputManager outputManager;
     private JetMetricsContainer metricsContainer;
-    private BufferingTracker bufferingTracker;
+    private SimpleInbox bufferedItems;
 
     private ParDoP(
             DoFn<InputT, OutputT> doFn,
@@ -90,6 +93,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
             Coder<InputT> inputCoder,
             Map<TupleTag<?>, Coder<?>> outputCoderMap,
             List<PCollectionView<?>> sideInputs,
+            BitSet sideInputOrdinals,
             String ownerId
     ) {
         this.pipelineOptions = pipelineOptions;
@@ -100,6 +104,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
         this.inputCoder = inputCoder;
         this.outputCoderMap = outputCoderMap;
         this.sideInputs = sideInputs;
+        this.sideInputOrdinals = sideInputOrdinals;
         this.ownerId = ownerId;
     }
 
@@ -113,11 +118,10 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
         SideInputReader sideInputReader;
         if (sideInputs.isEmpty()) {
-            bufferingTracker = null;
             sideInputReader = NullSideInputReader.of(sideInputs);
         } else {
+            bufferedItems = new SimpleInbox();
             sideInputHandler = new SideInputHandler(sideInputs, InMemoryStateInternals.forKey(null));
-            bufferingTracker = new BufferingTracker<>(sideInputs);
             sideInputReader = sideInputHandler;
         }
 
@@ -157,71 +161,64 @@ public class ParDoP<InputT, OutputT> implements Processor {
             // don't process more items until outputManager is empty
             return;
         }
-        boolean bundleStarted = false;
-        for (Object item; (item = inbox.peek()) != null; ) {
-            //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
-            //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
-            if (item instanceof SideInputValue) {
-                bundleStarted |= processSideInput((SideInputValue) item, bundleStarted);
+        if (sideInputOrdinals.get(ordinal)) {
+            processSideInput(inbox);
+        } else {
+            if (bufferedItems != null) {
+                processBufferedRegularItems(inbox);
             } else {
-                if (bufferingTracker != null) {
-                    bundleStarted |= processBufferedRegularItem((WindowedValue<InputT>) item, bundleStarted);
-                } else {
-                    bundleStarted |= processNonBufferedRegularItem((WindowedValue<InputT>) item, bundleStarted);
-                }
+                processNonBufferedRegularItems(inbox);
             }
-            inbox.remove();
+        }
+    }
+
+    private void processSideInput(Inbox inbox) {
+        for (SideInputValue sideInput; (sideInput = (SideInputValue) inbox.poll()) != null; ) {
+            sideInputHandler.addSideInputValue(sideInput.getView(), sideInput.getWindowedValue());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void processNonBufferedRegularItems(Inbox inbox) {
+        doFnRunner.startBundle();
+        for (WindowedValue<InputT> windowedValue; (windowedValue = (WindowedValue<InputT>) inbox.poll()) != null; ) {
+            doFnRunner.processElement(windowedValue);
             if (!outputManager.tryFlush()) {
                 break;
             }
         }
-        if (bundleStarted) {
-            doFnRunner.finishBundle();
-        }
+        doFnRunner.finishBundle();
         // finishBundle can also add items to outputManager, they will be flushed in tryProcess() or complete()
     }
 
-    private boolean processSideInput(SideInputValue sideInput, boolean bundleStarted) {
-        PCollectionView<?> view = sideInput.getView();
-        Collection<WindowedValue<Iterable<?>>> windowedValues = sideInput.getWindowedValues();
-        for (WindowedValue<Iterable<?>> value : windowedValues) {
-            sideInputHandler.addSideInputValue(view, value);
+    @SuppressWarnings("unchecked")
+    private void processBufferedRegularItems(Inbox inbox) {
+        for (WindowedValue<InputT> windowedValue; (windowedValue = (WindowedValue<InputT>) inbox.poll()) != null; ) {
+            bufferedItems.add(windowedValue);
         }
-
-        if (bufferingTracker != null) {
-            List<WindowedValue<InputT>> items = bufferingTracker.flush(view);
-            for (WindowedValue<InputT> item : items) {
-                bundleStarted |= processNonBufferedRegularItem(item, bundleStarted);
-            }
-        }
-        return bundleStarted;
-    }
-
-    private boolean processNonBufferedRegularItem(WindowedValue<InputT> item, boolean bundleStarted) {
-        if (!bundleStarted) {
-            doFnRunner.startBundle();
-            bundleStarted = true;
-        }
-
-        WindowedValue<InputT> windowedValue = item;
-        doFnRunner.processElement(windowedValue);
-
-        return bundleStarted;
-    }
-
-    private boolean processBufferedRegularItem(WindowedValue<InputT> item, boolean bundleStarted) {
-        boolean bufferingNeeded = bufferingTracker.isBufferingNeeded();
-        if (bufferingNeeded) {
-            bufferingTracker.buffer(item);
-        } else {
-            bundleStarted |= processNonBufferedRegularItem(item, bundleStarted);
-        }
-        return bundleStarted;
     }
 
     @Override
     public boolean tryProcess() {
         return outputManager.tryFlush();
+    }
+
+    @Override
+    public boolean completeEdge(int ordinal) {
+        if (bufferedItems == null) {
+            return true;
+        }
+        sideInputOrdinals.clear(ordinal);
+        if (!sideInputOrdinals.isEmpty()) {
+            // there are more side inputs to complete
+            return true;
+        }
+        processNonBufferedRegularItems(bufferedItems);
+        if (bufferedItems.isEmpty()) {
+            bufferedItems = null;
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -310,6 +307,8 @@ public class ParDoP<InputT, OutputT> implements Processor {
         private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
         private final List<PCollectionView<?>> sideInputs;
 
+        private final Set<Integer> sideInputOrdinals = new HashSet<>();
+
         public Supplier(
                 String ownerId,
                 DoFn<InputT, OutputT> doFn,
@@ -334,6 +333,12 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
         @Override
         public Processor getEx() {
+            if (sideInputOrdinals.size() != sideInputs.size()) throw new RuntimeException("Oops");
+            BitSet sideInputOrdinalBitSet = new BitSet(sideInputOrdinals.stream().mapToInt(Integer::intValue).max().orElse(0));
+            for (int ordinal : sideInputOrdinals) {
+                sideInputOrdinalBitSet.set(ordinal);
+            }
+
             return new ParDoP<>(
                     serde(doFn),
                     windowingStrategy,
@@ -343,12 +348,13 @@ public class ParDoP<InputT, OutputT> implements Processor {
                     inputCoder,
                     outputCoderMap,
                     sideInputs,
+                    sideInputOrdinalBitSet,
                     ownerId
             );
         }
 
         @Override
-        public void isOutboundEdgeOfVertex(Edge edge, TupleTag pCollId, String vertexId) {
+        public void isOutboundEdgeOfVertex(Edge edge, TupleTag edgeId, TupleTag pCollId, String vertexId) {
             if (ownerId.equals(vertexId)) {
                 List<Integer> ordinals = outputCollToOrdinals.get(pCollId);
                 if (ordinals == null) throw new RuntimeException("Oops"); //todo
@@ -358,42 +364,40 @@ public class ParDoP<InputT, OutputT> implements Processor {
         }
 
         @Override
-        public void isInboundEdgeOfVertex(Edge edge, TupleTag pCollId, String vertexId) {
-            //do nothing
+        public void isInboundEdgeOfVertex(Edge edge, TupleTag edgeId, TupleTag pCollId, String vertexId) {
+            if (ownerId.equals(vertexId)) {
+                if (sideInputs.stream().map(Utils::getTupleTag).anyMatch(edgeId::equals)) {
+                    sideInputOrdinals.add(edge.getDestOrdinal());
+                }
+            }
         }
     }
 
-    private static class BufferingTracker<InputT> {
+    private class SimpleInbox implements Inbox {
+        private Deque<Object> items = new ArrayDeque<>();
 
-        private final Set<PCollectionView<?>> missingViews;
-        private List<WindowedValue<InputT>> bufferedItems = new ArrayList<>();
-
-        BufferingTracker(List<PCollectionView<?>> sideInputs) {
-            this.missingViews = new HashSet<>(sideInputs);
+        public void add(Object item) {
+            items.add(item);
         }
 
-        boolean isBufferingNeeded() {
-            return !missingViews.isEmpty();
+        @Override
+        public boolean isEmpty() {
+            return items.isEmpty();
         }
 
-        void buffer(WindowedValue<InputT> item) {
-            bufferedItems.add(item);
+        @Override
+        public Object peek() {
+            return items.peek();
         }
 
-        List<WindowedValue<InputT>> flush(PCollectionView<?> view) {
-            if (missingViews.isEmpty()) {
-                return Collections.emptyList();
-            } else {
-                missingViews.remove(view);
-                if (missingViews.isEmpty()) {
-                    List<WindowedValue<InputT>> flushedItems = bufferedItems;
-                    bufferedItems = new ArrayList<>();
-                    return flushedItems;
-                } else {
-                    return Collections.emptyList();
-                }
-            }
+        @Override
+        public Object poll() {
+            return items.poll();
+        }
 
+        @Override
+        public void remove() {
+            items.remove();
         }
     }
 }

@@ -17,11 +17,10 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
-import com.hazelcast.jet.Traversers;
 import com.hazelcast.jet.beam.SideInputValue;
 import com.hazelcast.jet.core.AbstractProcessor;
-import com.hazelcast.jet.core.ProcessorMetaSupplier;
-import com.hazelcast.jet.core.ProcessorSupplier;
+import com.hazelcast.jet.core.Processor;
+import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
 import org.apache.beam.sdk.transforms.windowing.TimestampCombiner;
@@ -32,14 +31,12 @@ import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
-import static com.hazelcast.jet.core.ProcessorMetaSupplier.forceTotalParallelismOne;
+import static com.hazelcast.jet.Traversers.traverseStream;
 
 /**
  * Collects all input {@link WindowedValue}s, groups them by windows and when
@@ -82,23 +79,15 @@ public class ViewP extends AbstractProcessor {
     public boolean complete() {
         //System.out.println(ViewP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         if (resultTraverser == null) {
-
-            Collection windowedValues = values.entrySet().stream()
-                    .map(
-                            e -> {
-                                BoundedWindow window = e.getKey();
-                                TimestampAndValues value = e.getValue();
-                                return WindowedValue.of(value.getValues(), value.timestamp, Collections.singleton(window), paneInfo);
-                            }
-                    )
-                    .collect(Collectors.toList());
-            resultTraverser = Traversers.singleton(new SideInputValue(view, windowedValues));
+            resultTraverser = traverseStream(
+                    values.entrySet().stream().map(e -> new SideInputValue(view,
+                            WindowedValue.of(e.getValue().values, e.getValue().timestamp, Collections.singleton(e.getKey()), paneInfo))));
         }
         return emitFromTraverser(resultTraverser);
     }
 
-    public static ProcessorMetaSupplier supplier(PCollectionView<?> view, WindowingStrategy<?, ?> windowingStrategy, String ownerId) {
-        return forceTotalParallelismOne(ProcessorSupplier.of(() -> new ViewP(view, windowingStrategy, ownerId)));
+    public static SupplierEx<Processor> supplier(PCollectionView<?> view, WindowingStrategy<?, ?> windowingStrategy, String ownerId) {
+        return () -> new ViewP(view, windowingStrategy, ownerId);
     }
 
     public static class TimestampAndValues {

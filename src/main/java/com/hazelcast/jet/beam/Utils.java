@@ -44,7 +44,7 @@ import static java.util.stream.Collectors.toList;
 
 public class Utils {
 
-    static TupleTag<?> getTupleTag(PValue value) {
+    public static TupleTag<?> getTupleTag(PValue value) {
         Map<TupleTag<?>, PValue> expansion = value.expand();
         if (expansion.size() != 1) throw new RuntimeException(); //todo: Houston, we have a problem!
         return expansion.keySet().iterator().next();
