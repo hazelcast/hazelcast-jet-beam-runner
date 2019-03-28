@@ -245,7 +245,7 @@
                                         <argument>--manageResources=false</argument>
                                         <argument>--monitorJobs=true</argument>
                                         <argument>--jetGroupName=jet</argument>
-                                        <argument>--jetLocalParalellism=-1</argument>
+                                        <argument>--jetLocalParallelism=-1</argument>
                                     </arguments>
                                 </configuration>
                             </execution>
