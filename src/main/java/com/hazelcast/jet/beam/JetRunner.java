@@ -57,6 +57,7 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         try {
             normalize(pipeline);
             DAG dag = translate(pipeline);
+            System.out.println(dag.toString());
             return run(dag);
         } catch (UnsupportedOperationException uoe) {
             return new FailedRunningPipelineResults(uoe);
@@ -73,9 +74,9 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         pipeline.traverseTopologically(printVisitor);
         System.out.println("Beam pipeline:" + printVisitor.print()); //todo: remove*/
 
-        /*PrintFullGraphVisitor printFullVisitor = new PrintFullGraphVisitor();
+        PrintFullGraphVisitor printFullVisitor = new PrintFullGraphVisitor();
         pipeline.traverseTopologically(printFullVisitor);
-        System.out.println("Beam pipeline:" + printFullVisitor.print()); //todo: remove*/
+        System.out.println("Beam pipeline:" + printFullVisitor.print()); //todo: remove
 
         //Set<ExecutableStage> fusedStages = GreedyPipelineFuser.fuse(PipelineTranslation.toProto(pipeline)).getFusedStages();
         //System.out.println("Pipeline fused into " + fusedStages.size() + " stages"); //todo: remove
