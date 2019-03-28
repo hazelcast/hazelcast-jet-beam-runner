@@ -16,12 +16,13 @@
 
 package com.hazelcast.jet.beam;
 
+import com.hazelcast.jet.core.Vertex;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.runners.TransformHierarchy;
 import org.apache.beam.sdk.transforms.PTransform;
 
 interface JetTransformTranslator<T extends PTransform> {
 
-    void translate(Pipeline pipeline, TransformHierarchy.Node node, JetTranslationContext context);
+    Vertex translate(Pipeline pipeline, TransformHierarchy.Node node, JetTranslationContext context);
 
 }

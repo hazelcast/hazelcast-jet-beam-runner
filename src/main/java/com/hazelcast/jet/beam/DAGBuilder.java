@@ -96,10 +96,10 @@ public class DAGBuilder {
         return dag.newVertex(id, processorMetaSupplier);
     }
 
-    Vertex addVertex(String id, SupplierEx<Processor> processor, boolean canBeParallel) {
+    Vertex addVertex(String id, SupplierEx<Processor> processor) {
         return dag
                 .newVertex(id, processor)
-                .localParallelism(canBeParallel ? localParallelism : 1) //todo: quick and dirty hack for now, can't leave it like this
+                .localParallelism(localParallelism) //todo: quick and dirty hack for now, can't leave it like this
                 ;
     }
 

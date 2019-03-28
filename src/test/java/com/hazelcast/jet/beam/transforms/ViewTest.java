@@ -292,7 +292,8 @@ public class ViewTest extends AbstractTransformTest {
     public void testIterableSideInput() {
 
         final PCollectionView<Iterable<Integer>> view =
-                pipeline.apply("CreateSideInput", Create.of(11, 13, 17, 23)).apply(View.asIterable());
+                pipeline.apply("CreateSideInput", Create.of(11, 13, 17, 23))
+                        .apply(View.asIterable());
 
         PCollection<Integer> output =
                 pipeline

@@ -20,8 +20,8 @@ import com.hazelcast.jet.Traverser;
 import com.hazelcast.jet.Traversers;
 import com.hazelcast.jet.beam.SideInputValue;
 import com.hazelcast.jet.core.AbstractProcessor;
-import com.hazelcast.jet.core.Processor;
-import com.hazelcast.jet.function.SupplierEx;
+import com.hazelcast.jet.core.ProcessorMetaSupplier;
+import com.hazelcast.jet.core.ProcessorSupplier;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
 import org.apache.beam.sdk.transforms.windowing.TimestampCombiner;
@@ -38,6 +38,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import static com.hazelcast.jet.core.ProcessorMetaSupplier.forceTotalParallelismOne;
 
 /**
  * Collects all input {@link WindowedValue}s, groups them by windows and when
@@ -95,8 +97,8 @@ public class ViewP extends AbstractProcessor {
         return emitFromTraverser(resultTraverser);
     }
 
-    public static SupplierEx<Processor> supplier(PCollectionView<?> view, WindowingStrategy<?, ?> windowingStrategy, String ownerId) {
-        return () -> new ViewP(view, windowingStrategy, ownerId);
+    public static ProcessorMetaSupplier supplier(PCollectionView<?> view, WindowingStrategy<?, ?> windowingStrategy, String ownerId) {
+        return forceTotalParallelismOne(ProcessorSupplier.of(() -> new ViewP(view, windowingStrategy, ownerId)));
     }
 
     public static class TimestampAndValues {

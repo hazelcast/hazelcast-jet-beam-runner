@@ -117,7 +117,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
             sideInputReader = NullSideInputReader.of(sideInputs);
         } else {
             sideInputHandler = new SideInputHandler(sideInputs, InMemoryStateInternals.forKey(null));
-            bufferingTracker = new BufferingTracker(sideInputs);
+            bufferingTracker = new BufferingTracker<>(sideInputs);
             sideInputReader = sideInputHandler;
         }
 
@@ -363,7 +363,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
         }
     }
 
-    private class BufferingTracker {
+    private static class BufferingTracker<InputT> {
 
         private final Set<PCollectionView<?>> missingViews;
         private List<WindowedValue<InputT>> bufferedItems = new ArrayList<>();
