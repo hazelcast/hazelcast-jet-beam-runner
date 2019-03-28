@@ -49,6 +49,7 @@ public class DAGBuilder {
     };
 
     private final DAG dag = new DAG();
+    private final int localParallelism;
 
     private final Map<TupleTag, Vertex> edgeStartPoints = new HashMap<>();
     private final Map<TupleTag, List<Vertex>> edgeEndPoints = new HashMap<>();
@@ -57,6 +58,10 @@ public class DAGBuilder {
     private final List<WiringListener> listeners = new ArrayList<>();
 
     private int vertexId = 0;
+
+    DAGBuilder(JetPipelineOptions options) {
+        this.localParallelism = options.getJetLocalParalellism();
+    }
 
     DAG getDag() {
         wireUp();
@@ -94,7 +99,7 @@ public class DAGBuilder {
     Vertex addVertex(String id, SupplierEx<Processor> processor, boolean canBeParallel) {
         return dag
                 .newVertex(id, processor)
-                .localParallelism(canBeParallel ? 2 : 1) //todo: quick and dirty hack for now, can't leave it like this
+                .localParallelism(canBeParallel ? localParallelism : 1) //todo: quick and dirty hack for now, can't leave it like this
                 ;
     }
 

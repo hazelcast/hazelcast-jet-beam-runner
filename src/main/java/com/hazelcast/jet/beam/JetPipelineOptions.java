@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam;
 
+import org.apache.beam.sdk.options.Default;
 import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.Validation;
@@ -26,5 +27,11 @@ public interface JetPipelineOptions extends PipelineOptions {
     @Validation.Required
     String getJetGroupName();
     void setJetGroupName(String jetGroupName);
+
+    @Description("Local parallelism of Jet nodes")
+    @Validation.Required
+    @Default.Integer(-1)
+    Integer getJetLocalParalellism();
+    void setJetLocalParalellism(Integer localParalellism);
 
 }

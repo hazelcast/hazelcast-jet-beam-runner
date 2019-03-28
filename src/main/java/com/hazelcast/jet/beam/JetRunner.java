@@ -117,6 +117,11 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
 
     private static JetPipelineOptions validate(JetPipelineOptions options) {
         if (options.getJetGroupName() == null) throw new IllegalArgumentException("Jet group NAME not set in options!");
+
+        Integer localParalellism = options.getJetLocalParalellism();
+        if (localParalellism == null) throw new IllegalArgumentException("Jet node local parallelism must be specified!");
+        if (localParalellism != -1 && localParalellism < 1) throw new IllegalArgumentException("Jet node local paralellism must be -1 or at least 1!");
+
         return options;
     }
 

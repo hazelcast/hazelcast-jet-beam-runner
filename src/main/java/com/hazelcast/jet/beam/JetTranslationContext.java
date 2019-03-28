@@ -26,10 +26,11 @@ import org.apache.beam.sdk.values.WindowingStrategy;
 public class JetTranslationContext {
 
     private final SerializablePipelineOptions options;
-    private final DAGBuilder dagBuilder = new DAGBuilder();
+    private final DAGBuilder dagBuilder;
 
     JetTranslationContext(JetPipelineOptions options) {
         this.options = new SerializablePipelineOptions(options);
+        this.dagBuilder = new DAGBuilder(options);
     }
 
     SerializablePipelineOptions getOptions() {

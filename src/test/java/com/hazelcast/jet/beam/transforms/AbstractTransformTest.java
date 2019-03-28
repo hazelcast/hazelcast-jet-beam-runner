@@ -48,7 +48,9 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
 
     private static TestPipeline getTestPipeline() {
         PipelineOptions options = PipelineOptionsFactory.create();
-        options.as(JetPipelineOptions.class).setJetGroupName(JetConfig.DEFAULT_GROUP_NAME);
+        JetPipelineOptions jetOptions = options.as(JetPipelineOptions.class);
+        jetOptions.setJetGroupName(JetConfig.DEFAULT_GROUP_NAME);
+        jetOptions.setJetLocalParalellism(2);
         options.setRunner(TestJetRunner.class);
         return TestPipeline.fromOptions(options);
     }
