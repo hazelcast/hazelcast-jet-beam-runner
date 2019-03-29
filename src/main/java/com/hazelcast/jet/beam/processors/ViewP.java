@@ -17,7 +17,6 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
-import com.hazelcast.jet.beam.SideInputValue;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.function.SupplierEx;
@@ -51,7 +50,7 @@ public class ViewP extends AbstractProcessor {
 
     private Map<BoundedWindow, TimestampAndValues> values = new HashMap<>();
     private PaneInfo paneInfo = PaneInfo.NO_FIRING;
-    private Traverser<SideInputValue> resultTraverser;
+    private Traverser<WindowedValue> resultTraverser;
 
     private ViewP(PCollectionView view, WindowingStrategy windowingStrategy, String ownerId) {
         this.timestampCombiner = windowingStrategy.getTimestampCombiner();
@@ -80,8 +79,7 @@ public class ViewP extends AbstractProcessor {
         //System.out.println(ViewP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         if (resultTraverser == null) {
             resultTraverser = traverseStream(
-                    values.entrySet().stream().map(e -> new SideInputValue(view,
-                            WindowedValue.of(e.getValue().values, e.getValue().timestamp, Collections.singleton(e.getKey()), paneInfo))));
+                    values.entrySet().stream().map(e -> WindowedValue.of(e.getValue().values, e.getValue().timestamp, Collections.singleton(e.getKey()), paneInfo)));
         }
         return emitFromTraverser(resultTraverser);
     }

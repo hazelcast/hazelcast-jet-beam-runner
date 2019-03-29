@@ -17,7 +17,6 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.beam.DAGBuilder;
-import com.hazelcast.jet.beam.SideInputValue;
 import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.beam.metrics.JetMetricsContainer;
 import com.hazelcast.jet.core.Edge;
@@ -51,8 +50,8 @@ import javax.annotation.Nonnull;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +61,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.hazelcast.jet.beam.Utils.serde;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.unmodifiableMap;
 
 public class ParDoP<InputT, OutputT> implements Processor {
 
@@ -72,8 +73,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
     private final TupleTag<OutputT> mainOutputTag;
     private final Coder<InputT> inputCoder;
     private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
-    private final List<PCollectionView<?>> sideInputs;
-    private final BitSet sideInputOrdinals;
+    private final Map<Integer, PCollectionView<?>> ordinalToSideInput;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
 
@@ -83,6 +83,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
     private JetOutputManager outputManager;
     private JetMetricsContainer metricsContainer;
     private SimpleInbox bufferedItems;
+    private Set<Integer> completedSideInputs = new HashSet<>();
 
     private ParDoP(
             DoFn<InputT, OutputT> doFn,
@@ -92,8 +93,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
             TupleTag<OutputT> mainOutputTag,
             Coder<InputT> inputCoder,
             Map<TupleTag<?>, Coder<?>> outputCoderMap,
-            List<PCollectionView<?>> sideInputs,
-            BitSet sideInputOrdinals,
+            Map<Integer, PCollectionView<?>> ordinalToSideInput,
             String ownerId
     ) {
         this.pipelineOptions = pipelineOptions;
@@ -103,8 +103,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
         this.mainOutputTag = mainOutputTag;
         this.inputCoder = inputCoder;
         this.outputCoderMap = outputCoderMap;
-        this.sideInputs = sideInputs;
-        this.sideInputOrdinals = sideInputOrdinals;
+        this.ordinalToSideInput = ordinalToSideInput;
         this.ownerId = ownerId;
     }
 
@@ -117,11 +116,11 @@ public class ParDoP<InputT, OutputT> implements Processor {
         doFnInvoker.invokeSetup();
 
         SideInputReader sideInputReader;
-        if (sideInputs.isEmpty()) {
-            sideInputReader = NullSideInputReader.of(sideInputs);
+        if (ordinalToSideInput.isEmpty()) {
+            sideInputReader = NullSideInputReader.of(emptyList());
         } else {
             bufferedItems = new SimpleInbox();
-            sideInputHandler = new SideInputHandler(sideInputs, InMemoryStateInternals.forKey(null));
+            sideInputHandler = new SideInputHandler(ordinalToSideInput.values(), InMemoryStateInternals.forKey(null));
             sideInputReader = sideInputHandler;
         }
 
@@ -161,8 +160,9 @@ public class ParDoP<InputT, OutputT> implements Processor {
             // don't process more items until outputManager is empty
             return;
         }
-        if (sideInputOrdinals.get(ordinal)) {
-            processSideInput(inbox);
+        PCollectionView<?> sideInputView = ordinalToSideInput.get(ordinal);
+        if (sideInputView != null) {
+            processSideInput(sideInputView, inbox);
         } else {
             if (bufferedItems != null) {
                 processBufferedRegularItems(inbox);
@@ -172,9 +172,9 @@ public class ParDoP<InputT, OutputT> implements Processor {
         }
     }
 
-    private void processSideInput(Inbox inbox) {
-        for (SideInputValue sideInput; (sideInput = (SideInputValue) inbox.poll()) != null; ) {
-            sideInputHandler.addSideInputValue(sideInput.getView(), sideInput.getWindowedValue());
+    private void processSideInput(PCollectionView<?> sideInputView, Inbox inbox) {
+        for (WindowedValue<Iterable<?>> value; (value = (WindowedValue) inbox.poll()) != null; ) {
+            sideInputHandler.addSideInputValue(sideInputView, value);
         }
     }
 
@@ -205,11 +205,11 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
     @Override
     public boolean completeEdge(int ordinal) {
-        if (bufferedItems == null) {
-            return true;
+        if (ordinalToSideInput.get(ordinal) == null) {
+            return true; // ignore non-side-input edges
         }
-        sideInputOrdinals.clear(ordinal);
-        if (!sideInputOrdinals.isEmpty()) {
+        completedSideInputs.add(ordinal);
+        if (completedSideInputs.size() != ordinalToSideInput.size()) {
             // there are more side inputs to complete
             return true;
         }
@@ -307,7 +307,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
         private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
         private final List<PCollectionView<?>> sideInputs;
 
-        private final Set<Integer> sideInputOrdinals = new HashSet<>();
+        private final Map<Integer, PCollectionView<?>> ordinalToSideInput = new HashMap<>();
 
         public Supplier(
                 String ownerId,
@@ -333,11 +333,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
         @Override
         public Processor getEx() {
-            if (sideInputOrdinals.size() != sideInputs.size()) throw new RuntimeException("Oops");
-            BitSet sideInputOrdinalBitSet = new BitSet(sideInputOrdinals.stream().mapToInt(Integer::intValue).max().orElse(0));
-            for (int ordinal : sideInputOrdinals) {
-                sideInputOrdinalBitSet.set(ordinal);
-            }
+            if (ordinalToSideInput.size() != sideInputs.size()) throw new RuntimeException("Oops");
 
             return new ParDoP<>(
                     serde(doFn),
@@ -346,9 +342,8 @@ public class ParDoP<InputT, OutputT> implements Processor {
                     pipelineOptions,
                     mainOutputTag,
                     inputCoder,
-                    outputCoderMap,
-                    sideInputs,
-                    sideInputOrdinalBitSet,
+                    unmodifiableMap(outputCoderMap),
+                    unmodifiableMap(ordinalToSideInput),
                     ownerId
             );
         }
@@ -366,8 +361,11 @@ public class ParDoP<InputT, OutputT> implements Processor {
         @Override
         public void isInboundEdgeOfVertex(Edge edge, TupleTag edgeId, TupleTag pCollId, String vertexId) {
             if (ownerId.equals(vertexId)) {
-                if (sideInputs.stream().map(Utils::getTupleTag).anyMatch(edgeId::equals)) {
-                    sideInputOrdinals.add(edge.getDestOrdinal());
+                for (PCollectionView<?> pCollectionView : sideInputs) {
+                    if (edgeId.equals(Utils.getTupleTag(pCollectionView))) {
+                        ordinalToSideInput.put(edge.getDestOrdinal(), pCollectionView);
+                        break;
+                    }
                 }
             }
         }
