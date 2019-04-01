@@ -30,12 +30,16 @@ import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.PipelineRunner;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.runners.PTransformOverride;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
 public class JetRunner extends PipelineRunner<PipelineResult> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JetRunner.class);
 
     public static JetRunner fromOptions(PipelineOptions options) {
         return fromOptions(options, Jet::newJetClient);
@@ -57,7 +61,9 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         try {
             normalize(pipeline);
             DAG dag = translate(pipeline);
-            System.out.println(dag.toString());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(dag.toString());
+            }
             return run(dag);
         } catch (UnsupportedOperationException uoe) {
             return new FailedRunningPipelineResults(uoe);
