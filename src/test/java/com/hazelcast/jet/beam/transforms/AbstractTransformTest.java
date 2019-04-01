@@ -52,6 +52,7 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
         jetOptions.setJetGroupName(JetConfig.DEFAULT_GROUP_NAME);
         jetOptions.setJetLocalParallelism(2);
         options.setRunner(TestJetRunner.class);
+//        options.setRunner(DirectRunner.class);
         return TestPipeline.fromOptions(options);
     }
 

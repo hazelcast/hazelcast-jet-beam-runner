@@ -23,6 +23,7 @@ import com.hazelcast.jet.core.Edge;
 import com.hazelcast.jet.core.Inbox;
 import com.hazelcast.jet.core.Outbox;
 import com.hazelcast.jet.core.Processor;
+import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.runners.core.DoFnRunner;
 import org.apache.beam.runners.core.DoFnRunners;
@@ -84,6 +85,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
     private JetMetricsContainer metricsContainer;
     private SimpleInbox bufferedItems;
     private Set<Integer> completedSideInputs = new HashSet<>();
+    private Outbox outbox;
 
     private ParDoP(
             DoFn<InputT, OutputT> doFn,
@@ -109,6 +111,7 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
     @Override
     public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
+        this.outbox = outbox;
         metricsContainer = new JetMetricsContainer(ownerId, context);
         MetricsEnvironment.setCurrentContainer(metricsContainer); //todo: this is correct only as long as the processor is non-cooperative
 
@@ -201,6 +204,11 @@ public class ParDoP<InputT, OutputT> implements Processor {
     @Override
     public boolean tryProcess() {
         return outputManager.tryFlush();
+    }
+
+    @Override
+    public boolean tryProcessWatermark(@Nonnull Watermark watermark) {
+        return outbox.offer(watermark);
     }
 
     @Override

@@ -21,6 +21,9 @@ import com.hazelcast.jet.beam.processors.BoundedSourceP;
 import com.hazelcast.jet.beam.processors.FlattenP;
 import com.hazelcast.jet.beam.processors.ImpulseP;
 import com.hazelcast.jet.beam.processors.ParDoP;
+import com.hazelcast.jet.beam.processors.TestStreamP;
+import com.hazelcast.jet.beam.processors.TestStreamP.SerializableTimestampedValue;
+import com.hazelcast.jet.beam.processors.TestStreamP.SerializableWatermarkEvent;
 import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
@@ -35,6 +38,9 @@ import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.io.BoundedSource;
 import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy.Node;
+import org.apache.beam.sdk.testing.TestStream;
+import org.apache.beam.sdk.testing.TestStream.ElementEvent;
+import org.apache.beam.sdk.testing.TestStream.WatermarkEvent;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
@@ -56,7 +62,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
+import static java.util.stream.Collectors.toList;
 import static org.apache.beam.vendor.guava.v20_0.com.google.common.base.Preconditions.checkState;
 
 @SuppressWarnings("unchecked")
@@ -75,6 +84,7 @@ class JetTransformTranslators {
         TRANSLATORS.put(PTransformTranslation.FLATTEN_TRANSFORM_URN, new FlattenTranslator());
         TRANSLATORS.put(PTransformTranslation.ASSIGN_WINDOWS_TRANSFORM_URN, new WindowTranslator());
         TRANSLATORS.put(PTransformTranslation.IMPULSE_TRANSFORM_URN, new ImpulseTranslator());
+        TRANSLATORS.put(PTransformTranslation.TEST_STREAM_TRANSFORM_URN, new TestStreamTranslator());
     }
 
     static JetTransformTranslator<?> getTranslator(PTransform<?, ?> transform) {
@@ -88,32 +98,32 @@ class JetTransformTranslators {
         public Vertex translate(Pipeline pipeline, Node node, JetTranslationContext context) {
             AppliedPTransform<PBegin, PCollection<T>, PTransform<PBegin, PCollection<T>>> appliedTransform =
                     (AppliedPTransform<PBegin, PCollection<T>, PTransform<PBegin, PCollection<T>>>) node.toAppliedPTransform(pipeline);
-            if (Utils.isBounded(appliedTransform)) {
-                @SuppressWarnings("unchecked")
-                BoundedSource<T> source;
-                try {
-                    source = ReadTranslation.boundedSourceFromTransform(appliedTransform);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-                Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
-
-                String transformName = appliedTransform.getFullName();
-                DAGBuilder dagBuilder = context.getDagBuilder();
-                String vertexId = dagBuilder.newVertexId(transformName);
-                SerializablePipelineOptions pipelineOptions = context.getOptions();
-                ProcessorMetaSupplier processorSupplier = BoundedSourceP.supplier(source, pipelineOptions, vertexId);
-
-                Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
-
-                TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
-                dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
-                dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
-                return vertex;
-            } else {
+            if (!Utils.isBounded(appliedTransform)) {
                 throw new UnsupportedOperationException(); //todo
             }
+
+            @SuppressWarnings("unchecked")
+            BoundedSource<T> source;
+            try {
+                source = ReadTranslation.boundedSourceFromTransform(appliedTransform);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+
+            String transformName = appliedTransform.getFullName();
+            DAGBuilder dagBuilder = context.getDagBuilder();
+            String vertexId = dagBuilder.newVertexId(transformName);
+            SerializablePipelineOptions pipelineOptions = context.getOptions();
+            ProcessorMetaSupplier processorSupplier = BoundedSourceP.supplier(source, pipelineOptions, vertexId);
+
+            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
+
+            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
+            return vertex;
         }
     }
 
@@ -347,6 +357,40 @@ class JetTransformTranslators {
             String vertexId = dagBuilder.newVertexId(transformName);
 
             Vertex vertex = dagBuilder.addVertex(vertexId, ImpulseP.supplier(vertexId));
+
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
+            return vertex;
+        }
+    }
+
+    private static class TestStreamTranslator<T> implements JetTransformTranslator<PTransform<PBegin, PCollection<T>>> {
+        @Override
+        public Vertex translate(Pipeline pipeline, Node node, JetTranslationContext context) {
+            AppliedPTransform<?, ?, ?> appliedTransform = node.toAppliedPTransform(pipeline);
+
+            String transformName = appliedTransform.getFullName();
+            DAGBuilder dagBuilder = context.getDagBuilder();
+            String vertexId = dagBuilder.newVertexId(transformName);
+
+            TestStream<T> transform = (TestStream<T>) appliedTransform.getTransform();
+
+            // events in the transform are not serializable, we have to translate them. We'll also flatten the collection.
+            List<Object> serializableEvents = transform.getEvents().stream()
+                    .flatMap(e -> {
+                        if (e instanceof TestStream.WatermarkEvent) {
+                            return Stream.of(new SerializableWatermarkEvent(((WatermarkEvent<T>) e).getWatermark().getMillis()));
+                        } else if (e instanceof TestStream.ElementEvent) {
+                            return StreamSupport.stream(((ElementEvent<T>) e).getElements().spliterator(), false)
+                                                .map(te -> new SerializableTimestampedValue<>(te.getValue(), te.getTimestamp()));
+                        } else {
+                            throw new UnsupportedOperationException("Event type not supported: " + e.getClass() + ", event: " + e);
+                        }
+                    })
+                    .collect(toList());
+            Vertex vertex = dagBuilder.addVertex(vertexId, TestStreamP.supplier(serializableEvents));
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());

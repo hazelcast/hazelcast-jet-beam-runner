@@ -39,7 +39,7 @@ import static com.hazelcast.jet.Traversers.traverseStream;
 
 /**
  * Collects all input {@link WindowedValue}s, groups them by windows and when
- * input is complete emits one {@link SideInputValue} for each window.
+ * input is complete emits them.
  */
 public class ViewP extends AbstractProcessor {
 
