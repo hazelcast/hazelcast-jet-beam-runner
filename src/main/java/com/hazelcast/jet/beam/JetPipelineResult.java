@@ -43,12 +43,12 @@ public class JetPipelineResult implements PipelineResult {
 
     private final JetMetricResults metricResults = new JetMetricResults();
 
-    JetPipelineResult(IMapJet<String, MetricUpdates> metricsAccumulator) {
+    public JetPipelineResult(IMapJet<String, MetricUpdates> metricsAccumulator) {
         this.metricsAccumulator = Objects.requireNonNull(metricsAccumulator);
         this.metricsAccumulator.addEntryListener(metricResults, true);
     }
 
-    synchronized void setJob(Job job) {
+    public synchronized void setJob(Job job) {
         Job nonNullJob = job == null ? this.job : job;
         this.state = getState(nonNullJob);
         this.job = job;

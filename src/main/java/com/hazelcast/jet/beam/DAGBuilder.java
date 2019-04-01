@@ -62,7 +62,7 @@ public class DAGBuilder {
         this.localParallelism = options.getJetLocalParallelism();
     }
 
-    DAG getDag() {
+    public DAG getDag() {
         wireUp();
         return dag;
     }

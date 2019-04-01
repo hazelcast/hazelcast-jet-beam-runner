@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.io.GenerateSequence;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.MapElements;
@@ -43,8 +44,9 @@ public class SumGeneratedSequenceTest extends AbstractTransformTest {
                 .apply(Sum.longsGlobally())
                 .apply(MapElements.via(new FormatLongAsTextFn()));
 
-        PAssert.that(output).containsInAnyOrder("4950");
-        pipeline.run().waitUntilFinish();
+        PAssert.that(output).containsInAnyOrder("4951");
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        System.out.println("state = " + state); //todo: remove
     }
 
 }

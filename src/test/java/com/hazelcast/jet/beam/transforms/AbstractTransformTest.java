@@ -22,8 +22,12 @@ import com.hazelcast.jet.JetTestInstanceFactory;
 import com.hazelcast.jet.beam.JetPipelineOptions;
 import com.hazelcast.jet.beam.TestJetRunner;
 import com.hazelcast.jet.config.JetConfig;
+import org.apache.beam.runners.direct.DirectRunner;
+import org.apache.beam.runners.reference.PortableRunner;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
+import org.apache.beam.sdk.options.PortablePipelineOptions;
+import org.apache.beam.sdk.options.SdkHarnessOptions;
 import org.apache.beam.sdk.testing.TestPipeline;
 import org.apache.beam.sdk.transforms.SimpleFunction;
 import org.apache.beam.sdk.values.KV;
@@ -51,12 +55,32 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
 
     private static TestPipeline getTestPipeline() {
         PipelineOptions options = PipelineOptionsFactory.create();
+
+        //setupDirectRunner(options);
+        //setupClassicalJetRunner(options);
+        setupPortableRunner(options);
+
+        return TestPipeline.fromOptions(options);
+    }
+
+    private static void setupDirectRunner(PipelineOptions options) {
+        options.setRunner(DirectRunner.class);
+    }
+
+    private static void setupClassicalJetRunner(PipelineOptions options) {
+        options.setRunner(TestJetRunner.class);
         JetPipelineOptions jetOptions = options.as(JetPipelineOptions.class);
         jetOptions.setJetGroupName(JetConfig.DEFAULT_GROUP_NAME);
         jetOptions.setJetLocalParallelism(2);
-        options.setRunner(TestJetRunner.class);
-//        options.setRunner(DirectRunner.class);
-        return TestPipeline.fromOptions(options);
+    }
+
+    private static void setupPortableRunner(PipelineOptions options) {
+        options.setRunner(PortableRunner.class);
+        PortablePipelineOptions portablePipelineOptions = options.as(PortablePipelineOptions.class);
+        portablePipelineOptions.setJobEndpoint("localhost:8099");
+
+        SdkHarnessOptions sdkHarnessOptions = options.as(SdkHarnessOptions.class);
+        sdkHarnessOptions.setDefaultSdkHarnessLogLevel(SdkHarnessOptions.LogLevel.INFO);
     }
 
     private static JetTestInstanceFactory factory = new JetTestInstanceFactory();
