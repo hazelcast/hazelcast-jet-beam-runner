@@ -79,7 +79,7 @@ class PrintFullGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
 
         if (transform instanceof View.CreatePCollectionView) {
             sb.append("\n\t\tSide outputs:");
-            PrintGraphVisitor.printTags(Collections.singleton(Utils.getTupleTag(((View.CreatePCollectionView) transform).getView())), "\t", sb);
+            PrintGraphVisitor.printTags(Collections.singleton(Utils.getTupleTagId(((View.CreatePCollectionView) transform).getView())), "\t", sb);
         }
     }
 

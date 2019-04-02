@@ -25,7 +25,6 @@ import com.hazelcast.jet.function.FunctionEx;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
-import org.apache.beam.sdk.values.TupleTag;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -51,9 +50,9 @@ public class DAGBuilder {
     private final DAG dag = new DAG();
     private final int localParallelism;
 
-    private final Map<TupleTag, Vertex> edgeStartPoints = new HashMap<>();
-    private final Map<TupleTag, List<Vertex>> edgeEndPoints = new HashMap<>();
-    private final Map<TupleTag, TupleTag> pCollsOfEdges = new HashMap<>();
+    private final Map<String, Vertex> edgeStartPoints = new HashMap<>();
+    private final Map<String, List<Vertex>> edgeEndPoints = new HashMap<>();
+    private final Map<String, String> pCollsOfEdges = new HashMap<>();
 
     private final List<WiringListener> listeners = new ArrayList<>();
 
@@ -76,17 +75,17 @@ public class DAGBuilder {
         return vertexId++ + " (" + transformName + ")";
     }
 
-    void registerCollectionOfEdge(TupleTag<?> edgeId, TupleTag pCollId) {
-        TupleTag prevPCollId = pCollsOfEdges.put(edgeId, pCollId);
+    void registerCollectionOfEdge(String edgeId, String pCollId) {
+        String prevPCollId = pCollsOfEdges.put(edgeId, pCollId);
         if (prevPCollId != null) throw new RuntimeException("Oops!");
     }
 
-    void registerEdgeStartPoint(TupleTag<?> edgeId, Vertex vertex) {
+    void registerEdgeStartPoint(String edgeId, Vertex vertex) {
         Vertex prevVertex = edgeStartPoints.put(edgeId, vertex);
         if (prevVertex != null) throw new RuntimeException("Oops!");
     }
 
-    void registerEdgeEndPoint(TupleTag<?> edgeId, Vertex vertex) {
+    void registerEdgeEndPoint(String edgeId, Vertex vertex) {
         edgeEndPoints
                 .computeIfAbsent(edgeId, x -> new ArrayList<>())
                 .add(vertex);
@@ -113,12 +112,12 @@ public class DAGBuilder {
         private final Map<Vertex, Integer> outboundOrdinals = new HashMap<>();
 
         void wireUp() {
-            Collection<TupleTag> edgeIds = new HashSet<>();
+            Collection<String> edgeIds = new HashSet<>();
             edgeIds.addAll(edgeStartPoints.keySet());
             edgeIds.addAll(edgeEndPoints.keySet());
 
-            for (TupleTag edgeId : edgeIds) {
-                TupleTag pCollId = pCollsOfEdges.get(edgeId);
+            for (String edgeId : edgeIds) {
+                String pCollId = pCollsOfEdges.get(edgeId);
                 if (pCollId == null) throw new RuntimeException("Oops!");
 
                 Vertex sourceVertex = edgeStartPoints.get(edgeId);
@@ -132,7 +131,7 @@ public class DAGBuilder {
             }
         }
 
-        private void addEdge(Vertex sourceVertex, Vertex destinationVertex, TupleTag edgeId, TupleTag pCollId, boolean sideInputEdge) {
+        private void addEdge(Vertex sourceVertex, Vertex destinationVertex, String edgeId, String pCollId, boolean sideInputEdge) {
             //todo: set up the edges properly, including other aspects too, like parallelism
 
             try {
@@ -169,9 +168,9 @@ public class DAGBuilder {
 
     public interface WiringListener {
 
-        void isOutboundEdgeOfVertex(Edge edge, TupleTag edgeId, TupleTag pCollId, String vertexId);
+        void isOutboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId);
 
-        void isInboundEdgeOfVertex(Edge edge, TupleTag edgeId, TupleTag pCollId, String vertexId);
+        void isInboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId);
     }
 
 }

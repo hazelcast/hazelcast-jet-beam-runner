@@ -53,12 +53,12 @@ class PrintGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
 
         if (transform instanceof View.CreatePCollectionView) {
             sb.append("\n\t\tSide outputs:");
-            printTags(Collections.singleton(Utils.getTupleTag(((View.CreatePCollectionView) transform).getView())), "\t", sb);
+            printTags(Collections.singleton(Utils.getTupleTagId(((View.CreatePCollectionView) transform).getView())), "\t", sb);
         }
     }
 
-    static void printTags(Collection<TupleTag<?>> tags, String indent, StringBuilder sb) {
-        for (TupleTag tag : tags) {
+    static void printTags(Collection<?> tags, String indent, StringBuilder sb) {
+        for (Object tag : tags) {
             sb.append("\n\t\t").append(indent).append(tag);
         }
     }
@@ -69,7 +69,7 @@ class PrintGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
             return;
         }
         for (PValue value : values) {
-            sb.append("\n\t\t").append(indent).append(value.getName()).append(" (").append(Utils.getTupleTag(value)).append(")");
+            sb.append("\n\t\t").append(indent).append(value.getName()).append(" (").append(Utils.getTupleTagId(value)).append(")");
         }
     }
 

@@ -120,8 +120,8 @@ class JetTransformTranslators {
 
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
-            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
-            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            String outputEdgeId = Utils.getTupleTagId(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
             return vertex;
         }
@@ -213,19 +213,19 @@ class JetTransformTranslators {
 
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
             if (mainInputs.size() != 1) throw new RuntimeException("Oops!");
-            dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(mainInputs.iterator().next()), vertex);
+            dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(mainInputs.iterator().next()), vertex);
 
             Map<TupleTag<?>, PValue> additionalInputs = Utils.getAdditionalInputs(node);
             if (additionalInputs != null && !additionalInputs.isEmpty()) {
                 for (TupleTag<?> tupleTag : additionalInputs.keySet()) {
-                    dagBuilder.registerEdgeEndPoint(tupleTag, vertex);
+                    dagBuilder.registerEdgeEndPoint(tupleTag.getId(), vertex);
                 }
             }
 
             for (Map.Entry<TupleTag<?>, PValue> entry : outputs.entrySet()) {
                 TupleTag<?> pCollId = entry.getKey();
-                TupleTag<?> edgeId = Utils.getTupleTag(entry.getValue());
-                dagBuilder.registerCollectionOfEdge(edgeId, pCollId);
+                String edgeId = Utils.getTupleTagId(entry.getValue());
+                dagBuilder.registerCollectionOfEdge(edgeId, pCollId.getId());
                 dagBuilder.registerEdgeStartPoint(edgeId, vertex);
             }
 
@@ -251,10 +251,10 @@ class JetTransformTranslators {
                 String vertexId = dagBuilder.newVertexId(transformName);
                 Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(input.getWindowingStrategy(), vertexId));
 
-                dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
+                dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
 
-                TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
-                dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+                String outputEdgeId = Utils.getTupleTagId(output.getValue());
+                dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
                 dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
                 return vertex;
             } else {
@@ -284,15 +284,15 @@ class JetTransformTranslators {
 
             Vertex vertex = dagBuilder.addVertex(vertexId, ViewP.supplier(view, input.getWindowingStrategy(), vertexId));
 
-            dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
+            dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
 
-            TupleTag<?> viewTag = Utils.getTupleTag(view);
-            dagBuilder.registerCollectionOfEdge(viewTag, view.getTagInternal());
+            String viewTag = Utils.getTupleTagId(view);
+            dagBuilder.registerCollectionOfEdge(viewTag, view.getTagInternal().getId());
             dagBuilder.registerEdgeStartPoint(viewTag, vertex);
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
-            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
-            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            String outputEdgeId = Utils.getTupleTagId(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
             return vertex;
         }
@@ -311,12 +311,12 @@ class JetTransformTranslators {
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
             for (PValue value : mainInputs) {
                 PCollection<T> input = (PCollection<T>) value;
-                dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
+                dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
             }
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
-            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
-            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            String outputEdgeId = Utils.getTupleTagId(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
             return vertex;
         }
@@ -337,11 +337,11 @@ class JetTransformTranslators {
             Vertex vertex = dagBuilder.addVertex(vertexId, AssignWindowP.supplier(windowingStrategy, vertexId));
 
             PCollection<WindowedValue> input = Utils.getInput(appliedTransform);
-            dagBuilder.registerEdgeEndPoint(Utils.getTupleTag(input), vertex);
+            dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
-            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
-            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            String outputEdgeId = Utils.getTupleTagId(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
             return vertex;
         }
@@ -359,8 +359,8 @@ class JetTransformTranslators {
             Vertex vertex = dagBuilder.addVertex(vertexId, ImpulseP.supplier(vertexId));
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
-            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
-            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            String outputEdgeId = Utils.getTupleTagId(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
             return vertex;
         }
@@ -393,8 +393,8 @@ class JetTransformTranslators {
             Vertex vertex = dagBuilder.addVertex(vertexId, TestStreamP.supplier(serializableEvents));
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
-            TupleTag<?> outputEdgeId = Utils.getTupleTag(output.getValue());
-            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey());
+            String outputEdgeId = Utils.getTupleTagId(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
             return vertex;
         }

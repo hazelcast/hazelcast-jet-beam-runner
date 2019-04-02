@@ -357,9 +357,9 @@ public class ParDoP<InputT, OutputT> implements Processor {
         }
 
         @Override
-        public void isOutboundEdgeOfVertex(Edge edge, TupleTag edgeId, TupleTag pCollId, String vertexId) {
+        public void isOutboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId) {
             if (ownerId.equals(vertexId)) {
-                List<Integer> ordinals = outputCollToOrdinals.get(pCollId);
+                List<Integer> ordinals = outputCollToOrdinals.get(new TupleTag<>(pCollId));
                 if (ordinals == null) throw new RuntimeException("Oops"); //todo
 
                 ordinals.add(edge.getSourceOrdinal());
@@ -367,10 +367,10 @@ public class ParDoP<InputT, OutputT> implements Processor {
         }
 
         @Override
-        public void isInboundEdgeOfVertex(Edge edge, TupleTag edgeId, TupleTag pCollId, String vertexId) {
+        public void isInboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId) {
             if (ownerId.equals(vertexId)) {
                 for (PCollectionView<?> pCollectionView : sideInputs) {
-                    if (edgeId.equals(Utils.getTupleTag(pCollectionView))) {
+                    if (edgeId.equals(Utils.getTupleTagId(pCollectionView))) {
                         ordinalToSideInput.put(edge.getDestOrdinal(), pCollectionView);
                         break;
                     }

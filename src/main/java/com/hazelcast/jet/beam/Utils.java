@@ -44,10 +44,10 @@ import static java.util.stream.Collectors.toList;
 
 public class Utils {
 
-    public static TupleTag<?> getTupleTag(PValue value) {
+    public static String getTupleTagId(PValue value) {
         Map<TupleTag<?>, PValue> expansion = value.expand();
         if (expansion.size() != 1) throw new RuntimeException(); //todo: Houston, we have a problem!
-        return expansion.keySet().iterator().next();
+        return expansion.keySet().iterator().next().getId();
     }
 
     static Collection<PValue> getMainInputs(Pipeline pipeline, TransformHierarchy.Node node) {
