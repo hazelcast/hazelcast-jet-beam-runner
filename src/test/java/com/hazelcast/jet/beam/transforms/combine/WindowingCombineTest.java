@@ -27,6 +27,7 @@ import org.apache.beam.sdk.values.TimestampedValue;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.ImmutableList;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.Serializable;
@@ -218,6 +219,7 @@ public class WindowingCombineTest extends AbstractCombineTest {
     }
 
     @Test
+    @Ignore // trigger not supported
     public void testGlobalCombineWithDefaultsAndTriggers() {
         PCollection<Integer> input = pipeline.apply(Create.of(1, 1));
 

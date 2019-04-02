@@ -456,7 +456,7 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
+    @Ignore // timers not supported
     public void testEventTimeTimerCanBeReset() {
         final String timerId = "foo";
 
@@ -526,7 +526,7 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
+    @Ignore // timers not supported
     public void duplicateTimerSetting() {
         TestStream<KV<String, String>> stream =
                 TestStream.create(KvCoder.of(StringUtf8Coder.of(), StringUtf8Coder.of()))

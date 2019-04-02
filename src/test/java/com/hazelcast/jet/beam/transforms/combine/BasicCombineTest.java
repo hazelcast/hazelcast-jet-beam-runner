@@ -39,6 +39,7 @@ import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.POutput;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.ImmutableSet;
 import org.joda.time.Duration;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -118,6 +119,7 @@ public class BasicCombineTest extends AbstractCombineTest {
     }
 
     @Test
+    @Ignore // triggers not supported
     public void testHotKeyCombiningWithAccumulationMode() {
         PCollection<Integer> input = pipeline.apply(Create.of(1, 2, 3, 4, 5));
 

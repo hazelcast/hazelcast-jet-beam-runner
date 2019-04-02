@@ -22,7 +22,6 @@ import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
-import org.apache.beam.sdk.transforms.windowing.WindowFn;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.WindowingStrategy;
@@ -35,9 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.function.BiFunction;
 
 import static com.hazelcast.jet.Traversers.traverseStream;
 
@@ -46,8 +43,8 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
 
-    private final Map<K, Map<BoundedWindow, List<WindowedValue<KV<K, T>>>>> keyToWindowToList = new HashMap<>();
-    private Traverser<WindowedValue<KV<K, List<T>>>> resultTraverser;
+    private final Map<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>> windowToKeyToList = new HashMap<>();
+    private Traverser<WindowedValue<KV<K, List<T>>>> completionTraverser;
 
     private WindowGroupP(WindowingStrategy<T, BoundedWindow> windowingStrategy, String ownerId) {
         this.windowingStrategy = windowingStrategy;
@@ -64,9 +61,9 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
         K key = windowedValue.getValue().getKey();
 
         for (BoundedWindow window : windowedValue.getWindows()) {
-            keyToWindowToList
-                    .computeIfAbsent(key, k -> new HashMap<>())
-                    .computeIfAbsent(window, w -> new ArrayList<>())
+            windowToKeyToList
+                    .computeIfAbsent(window, w -> new HashMap<>())
+                    .computeIfAbsent(key, k -> new ArrayList<>())
                     .add(windowedValue);
         }
         return true;
@@ -74,51 +71,52 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
 
     @Override
     public boolean complete() {
-        //System.out.println(WindowGroupP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
-        if (resultTraverser == null) {
-            ResettableMergeContext mergeContext = new ResettableMergeContext<>(windowingStrategy.getWindowFn());
-            resultTraverser = traverseStream(keyToWindowToList.entrySet().stream())
-                    .flatMap(mainEntry -> {
-                        K key = mainEntry.getKey();
-                        @SuppressWarnings("unchecked")
-                        Map<BoundedWindow, List<WindowedValue<KV<K, T>>>> subMap =
-                                mergeWindows(mergeContext, mainEntry.getValue());
-                        return traverseStream(subMap.entrySet().stream())
-                                .map(e -> createOutput(key, e.getKey(), e.getValue()));
-                    });
+        if (completionTraverser == null) {
+            mergeWindows();
+            completionTraverser = traverseStream(windowToKeyToList.entrySet().stream())
+                    .flatMap(mainEntry -> traverseStream(mainEntry.getValue().entrySet().stream())
+                            .map(e -> createOutput(e.getKey(), mainEntry.getKey(), e.getValue())));
         }
-        return emitFromTraverser(resultTraverser);
+        return emitFromTraverser(completionTraverser);
     }
 
-    private Map<BoundedWindow, List<WindowedValue<KV<K, T>>>> mergeWindows(
-            ResettableMergeContext<T> mergeContext,
-            Map<BoundedWindow, List<WindowedValue<KV<K, T>>>> windowToListMap
-    ) {
+    private void mergeWindows() {
         if (windowingStrategy.getWindowFn().isNonMerging()) {
-            return windowToListMap;
+            return;
         }
-        mergeContext.reset(windowToListMap.keySet());
         try {
-            windowingStrategy.getWindowFn().mergeWindows(mergeContext);
+            windowingStrategy.getWindowFn().mergeWindows(windowingStrategy.getWindowFn().new MergeContext() {
+                @Override
+                public Collection windows() {
+                    return windowToKeyToList.keySet();
+                }
+
+                @Override
+                public void merge(Collection<BoundedWindow> windowsFrom, BoundedWindow windowTo) {
+                    BiFunction<List<WindowedValue<KV<K, T>>>, List<WindowedValue<KV<K, T>>>, List<WindowedValue<KV<K, T>>>> mappingFn = mergeToFirstList();
+                    for (BoundedWindow windowFrom : windowsFrom) {
+                        // shortcut - nothing to merge or change
+                        if (windowFrom.equals(windowTo)) {
+                            continue;
+                        }
+                        Map<K, List<WindowedValue<KV<K, T>>>> windowToData =
+                                windowToKeyToList.computeIfAbsent(windowTo, x -> new HashMap<>());
+                        // shortcut - just move from one window to another
+                        Map<K, List<WindowedValue<KV<K, T>>>> windowFromData = windowToKeyToList.remove(windowFrom);
+                        assert windowFromData != null : "windowFromData == null";
+                        if (windowToData.isEmpty()) {
+                            windowToKeyToList.put(windowTo, windowFromData);
+                            continue;
+                        }
+                        for (Entry<K, List<WindowedValue<KV<K, T>>>> entry : windowFromData.entrySet()) {
+                            windowToData.merge(entry.getKey(), entry.getValue(), mappingFn);
+                        }
+                    }
+                }
+            });
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-
-        // shortcut - no windows merged
-        if (mergeContext.windowToMergeResult.entrySet().stream().allMatch(en -> en.getKey().equals(en.getValue()))) {
-            return windowToListMap;
-        }
-
-        Map<BoundedWindow, List<WindowedValue<KV<K, T>>>> mergedWindowToListMap = new HashMap<>();
-        for (Entry<BoundedWindow, List<WindowedValue<KV<K, T>>>> windowEntry : windowToListMap.entrySet()) {
-            BoundedWindow initialWindow = windowEntry.getKey();
-            BoundedWindow finalWindow = mergeContext.windowToMergeResult.getOrDefault(initialWindow, initialWindow);
-            mergedWindowToListMap
-                    .merge(finalWindow,
-                            windowEntry.getValue(),
-                            (l1, l2) -> Stream.of(l1, l2).flatMap(Collection::stream).collect(Collectors.toList()));
-        }
-        return mergedWindowToListMap;
     }
 
     private WindowedValue<KV<K, List<T>>> createOutput(K key, BoundedWindow window, List<WindowedValue<KV<K, T>>> windowedValues) {
@@ -139,29 +137,10 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
         return () -> new WindowGroupP<>(windowingStrategy, ownerId);
     }
 
-    private static class ResettableMergeContext<T> extends WindowFn<T, BoundedWindow>.MergeContext {
-        private Set<BoundedWindow> windows;
-        private Map<BoundedWindow, BoundedWindow> windowToMergeResult = new HashMap<>();
-
-        ResettableMergeContext(WindowFn<T, BoundedWindow> windowFn) {
-            windowFn.super();
-        }
-
-        @Override
-        public Collection<BoundedWindow> windows() {
-            return windows;
-        }
-
-        @Override
-        public void merge(Collection<BoundedWindow> toBeMerged, BoundedWindow mergeResult) {
-            for (BoundedWindow w : toBeMerged) {
-                windowToMergeResult.put(w, mergeResult);
-            }
-        }
-
-        void reset(Set<BoundedWindow> windows) {
-            this.windows = windows;
-            windowToMergeResult.clear();
-        }
+    private static <T> BiFunction<List<T>, List<T>, List<T>> mergeToFirstList() {
+        return (first, second) -> {
+            first.addAll(second);
+            return first;
+        };
     }
 }

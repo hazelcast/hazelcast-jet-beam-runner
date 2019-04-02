@@ -45,6 +45,8 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
+import org.apache.beam.sdk.transforms.windowing.DefaultTrigger;
+import org.apache.beam.sdk.transforms.windowing.Never;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PBegin;
@@ -238,30 +240,35 @@ class JetTransformTranslators {
 
         @Override
         public Vertex translate(Pipeline pipeline, Node node, JetTranslationContext context) {
+            // todo type arguments are wrong here, but we don't care
             AppliedPTransform<PCollection<K>, PCollection<InputT>, PTransform<PCollection<K>, PCollection<InputT>>> appliedTransform =
                     (AppliedPTransform<PCollection<K>, PCollection<InputT>, PTransform<PCollection<K>, PCollection<InputT>>>) node.toAppliedPTransform(pipeline);
-            if (Utils.isBounded(appliedTransform)) {
-                String transformName = appliedTransform.getFullName();
+            String transformName = appliedTransform.getFullName();
 
-                PCollection<KV<K, InputT>> input = Utils.getInput(appliedTransform);
+            PCollection<KV<K, InputT>> input = Utils.getInput(appliedTransform);
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            assert input != null : "null input";
 
-                Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
-
-                DAGBuilder dagBuilder = context.getDagBuilder();
-                String vertexId = dagBuilder.newVertexId(transformName);
-                Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(input.getWindowingStrategy(), vertexId));
-
-                dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
-
-                String outputEdgeId = Utils.getTupleTagId(output.getValue());
-                dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
-                dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
-                return vertex;
-            } else {
-                throw new UnsupportedOperationException(); //todo
+            if (!input.getWindowingStrategy().getTrigger().isCompatible(DefaultTrigger.of())
+                    && !input.getWindowingStrategy().getTrigger().isCompatible(Never.ever())) {
+                throw new UnsupportedOperationException("Only DefaultTrigger and Never.NeverTrigger supported, got "
+                        + input.getWindowingStrategy().getTrigger());
             }
-        }
+            if (input.getWindowingStrategy().getAllowedLateness().getMillis() != 0) {
+                throw new UnsupportedOperationException("Non-zero allowed lateness not supported");
+            }
 
+            DAGBuilder dagBuilder = context.getDagBuilder();
+            String vertexId = dagBuilder.newVertexId(transformName);
+            Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(input.getWindowingStrategy(), vertexId));
+
+            dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
+
+            String outputEdgeId = Utils.getTupleTagId(output.getValue());
+            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
+            dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
+            return vertex;
+        }
     }
 
     private static class CreateViewTranslator<T> implements JetTransformTranslator<PTransform<PCollection<T>, PCollection<T>>> {
@@ -386,7 +393,7 @@ class JetTransformTranslators {
                             return StreamSupport.stream(((ElementEvent<T>) e).getElements().spliterator(), false)
                                                 .map(te -> new SerializableTimestampedValue<>(te.getValue(), te.getTimestamp()));
                         } else {
-                            throw new UnsupportedOperationException("Event type not supported: " + e.getClass() + ", event: " + e);
+                            throw new UnsupportedOperationException("Event type not supported in TestStream: " + e.getClass() + ", event: " + e);
                         }
                     })
                     .collect(toList());
