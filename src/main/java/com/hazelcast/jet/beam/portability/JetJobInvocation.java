@@ -28,6 +28,8 @@ import com.hazelcast.jet.beam.metrics.JetMetricsContainer;
 import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.core.DAG;
 import org.apache.beam.model.pipeline.v1.RunnerApi;
+import org.apache.beam.runners.core.construction.graph.ExecutableStage;
+import org.apache.beam.runners.core.construction.graph.GreedyPipelineFuser;
 import org.apache.beam.runners.core.construction.graph.PipelineNode;
 import org.apache.beam.runners.core.construction.graph.QueryablePipeline;
 import org.apache.beam.runners.core.metrics.MetricUpdates;
@@ -194,9 +196,11 @@ public class JetJobInvocation implements JobInvocation {
     }
 
     private DAG translate(RunnerApi.Pipeline pipeline) {
-        QueryablePipeline p =
-                QueryablePipeline.forTransforms(
-                        pipeline.getRootTransformIdsList(), pipeline.getComponents());
+        boolean isPipelineAlreadyFused = pipeline.getComponents().getTransformsMap().values().stream()
+                .anyMatch(proto -> ExecutableStage.URN.equals(proto.getSpec().getUrn()));
+        RunnerApi.Pipeline fusedPipeline = isPipelineAlreadyFused ? pipeline : GreedyPipelineFuser.fuse(pipeline).toPipeline();
+
+        QueryablePipeline p = QueryablePipeline.forTransforms(fusedPipeline.getRootTransformIdsList(), fusedPipeline.getComponents());
         for (PipelineNode.PTransformNode transform : p.getTopologicallyOrderedTransforms()) {
             PTransformTranslators.translate(transform, pipeline, translationContext);
         }

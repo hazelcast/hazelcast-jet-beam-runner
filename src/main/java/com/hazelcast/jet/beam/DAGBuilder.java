@@ -71,21 +71,21 @@ public class DAGBuilder {
         listeners.add(listener);
     }
 
-    String newVertexId(String transformName) {
+    public String newVertexId(String transformName) {
         return vertexId++ + " (" + transformName + ")";
     }
 
-    void registerCollectionOfEdge(String edgeId, String pCollId) {
+    public void registerCollectionOfEdge(String edgeId, String pCollId) {
         String prevPCollId = pCollsOfEdges.put(edgeId, pCollId);
         if (prevPCollId != null) throw new RuntimeException("Oops!");
     }
 
-    void registerEdgeStartPoint(String edgeId, Vertex vertex) {
+    public void registerEdgeStartPoint(String edgeId, Vertex vertex) {
         Vertex prevVertex = edgeStartPoints.put(edgeId, vertex);
         if (prevVertex != null) throw new RuntimeException("Oops!");
     }
 
-    void registerEdgeEndPoint(String edgeId, Vertex vertex) {
+    public void registerEdgeEndPoint(String edgeId, Vertex vertex) {
         edgeEndPoints
                 .computeIfAbsent(edgeId, x -> new ArrayList<>())
                 .add(vertex);
@@ -95,7 +95,7 @@ public class DAGBuilder {
         return dag.newVertex(id, processorMetaSupplier);
     }
 
-    Vertex addVertex(String id, SupplierEx<Processor> processor) {
+    public Vertex addVertex(String id, SupplierEx<Processor> processor) {
         return dag
                 .newVertex(id, processor)
                 .localParallelism(localParallelism) //todo: quick and dirty hack for now, can't leave it like this
