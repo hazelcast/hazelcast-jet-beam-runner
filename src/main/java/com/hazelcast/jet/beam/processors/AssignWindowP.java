@@ -16,12 +16,10 @@
 
 package com.hazelcast.jet.beam.processors;
 
-import com.hazelcast.jet.Traverser;
-import com.hazelcast.jet.Traversers;
+import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
-import com.hazelcast.jet.function.FunctionEx;
+import com.hazelcast.jet.core.ResettableSingletonTraverser;
 import com.hazelcast.jet.function.SupplierEx;
-import com.hazelcast.jet.impl.processor.TransformP;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.WindowFn;
 import org.apache.beam.sdk.util.WindowedValue;
@@ -29,41 +27,53 @@ import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Iterables;
 import org.joda.time.Instant;
 
+import javax.annotation.Nonnull;
 import java.util.Collection;
 
-public class AssignWindowP extends TransformP {
+public class AssignWindowP<InputT> extends AbstractProcessor {
 
     private final String ownerId;
 
-    public AssignWindowP(String ownerId, WindowingStrategy windowingStrategy) {
-        super(
-                (FunctionEx<Object, Traverser<?>>) o -> {
-                    WindowedValue input = (WindowedValue) o;
-                    Collection<? extends BoundedWindow> windows; //todo: tons of garbage!
-                    WindowFn windowFn = windowingStrategy.getWindowFn();
-                    try {
-                        windows = windowFn.assignWindows(new WindowAssignContext<>(windowFn, input));
-                    } catch (Exception e) {
-                        throw e;
-                    }
+    private final ResettableSingletonTraverser<WindowedValue<InputT>> traverser = new ResettableSingletonTraverser<>();
+    private final FlatMapper<WindowedValue<InputT>, WindowedValue<InputT>> flatMapper;
+    private final WindowAssignContext<InputT> windowAssignContext;
 
-                    return Traversers.traverseStream(
-                            windows.stream().map(window -> WindowedValue.of(input.getValue(), input.getTimestamp(), window, input.getPane()))
-                    );
-                }
-        );
+    private AssignWindowP(String ownerId, WindowingStrategy<InputT, BoundedWindow> windowingStrategy) {
         this.ownerId = ownerId;
+
+        windowAssignContext = new WindowAssignContext<>(windowingStrategy.getWindowFn());
+
+        flatMapper = flatMapper(item -> {
+            Collection<BoundedWindow> windows;
+            windowAssignContext.setValue(item);
+            try {
+                windows = windowingStrategy.getWindowFn().assignWindows(windowAssignContext);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            traverser.accept(WindowedValue.of(item.getValue(), item.getTimestamp(), windows, item.getPane()));
+            return traverser;
+        });
     }
 
-    public static SupplierEx<Processor> supplier(WindowingStrategy windowingStrategy, String ownerId) {
-        return () -> new AssignWindowP(ownerId, windowingStrategy);
+    @SuppressWarnings("unchecked")
+    @Override
+    protected boolean tryProcess(int ordinal, @Nonnull Object item) {
+        return flatMapper.tryProcess((WindowedValue<InputT>) item);
     }
 
-    private static class WindowAssignContext<InputT, W extends BoundedWindow> extends WindowFn<InputT, W>.AssignContext {
-        private final WindowedValue<InputT> value;
+    public static <InputT> SupplierEx<Processor> supplier(WindowingStrategy<InputT, BoundedWindow> windowingStrategy, String ownerId) {
+        return () -> new AssignWindowP<>(ownerId, windowingStrategy);
+    }
 
-        WindowAssignContext(WindowFn<InputT, W> fn, WindowedValue<InputT> value) {
+    private static class WindowAssignContext<InputT> extends WindowFn<InputT, BoundedWindow>.AssignContext {
+        private WindowedValue<InputT> value;
+
+        WindowAssignContext(WindowFn<InputT, BoundedWindow> fn) {
             fn.super();
+        }
+
+        public void setValue(WindowedValue<InputT> value) {
             if (Iterables.size(value.getWindows()) != 1) {
                 throw new IllegalArgumentException(
                         String.format(

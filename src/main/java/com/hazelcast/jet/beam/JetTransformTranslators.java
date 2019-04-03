@@ -339,8 +339,8 @@ class JetTransformTranslators {
         public Vertex translate(Pipeline pipeline, Node node, JetTranslationContext context) {
             AppliedPTransform<PCollection<T>, PCollection<T>, PTransform<PCollection<T>, PCollection<T>>> appliedTransform =
                     (AppliedPTransform<PCollection<T>, PCollection<T>, PTransform<PCollection<T>, PCollection<T>>>) node.toAppliedPTransform(pipeline);
-            WindowingStrategy<T, ? extends BoundedWindow> windowingStrategy =
-                    (WindowingStrategy<T, ? extends BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
+            WindowingStrategy<T, BoundedWindow> windowingStrategy =
+                    (WindowingStrategy<T, BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
 
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
