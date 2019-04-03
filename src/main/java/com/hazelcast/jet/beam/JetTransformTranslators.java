@@ -47,6 +47,7 @@ import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.DefaultTrigger;
 import org.apache.beam.sdk.transforms.windowing.Never;
+import org.apache.beam.sdk.transforms.windowing.Trigger;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PBegin;
@@ -249,18 +250,22 @@ class JetTransformTranslators {
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             assert input != null : "null input";
 
-            if (!input.getWindowingStrategy().getTrigger().isCompatible(DefaultTrigger.of())
-                    && !input.getWindowingStrategy().getTrigger().isCompatible(Never.ever())) {
+            WindowingStrategy<InputT, ? extends BoundedWindow> outputWindowingStrategy =
+                    (WindowingStrategy<InputT, ? extends BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
+            WindowingStrategy<?, ?> windowingStrategy = input.getWindowingStrategy();
+            Trigger trigger = outputWindowingStrategy.getTrigger();
+            if (!trigger.isCompatible(DefaultTrigger.of())
+                    && !trigger.isCompatible(Never.ever())) {
                 throw new UnsupportedOperationException("Only DefaultTrigger and Never.NeverTrigger supported, got "
-                        + input.getWindowingStrategy().getTrigger());
+                        + trigger);
             }
-            if (input.getWindowingStrategy().getAllowedLateness().getMillis() != 0) {
+            if (outputWindowingStrategy.getAllowedLateness().getMillis() != 0) {
                 throw new UnsupportedOperationException("Non-zero allowed lateness not supported");
             }
 
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
-            Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(input.getWindowingStrategy(), vertexId));
+            Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(windowingStrategy, vertexId));
 
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
 

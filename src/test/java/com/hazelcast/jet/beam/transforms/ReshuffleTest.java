@@ -42,7 +42,6 @@ import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.ImmutableList;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static junit.framework.TestCase.assertEquals;
@@ -53,7 +52,6 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.ReshuffleTest */
-@Ignore // ReshuffleTrigger not supported
 public class ReshuffleTest extends AbstractTransformTest {
 
     private static final ImmutableList<KV<String, Integer>> ARBITRARY_KVS =

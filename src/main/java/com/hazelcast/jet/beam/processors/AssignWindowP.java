@@ -44,7 +44,6 @@ public class AssignWindowP extends TransformP {
                     try {
                         windows = windowFn.assignWindows(new WindowAssignContext<>(windowFn, input));
                     } catch (Exception e) {
-                        e.printStackTrace();
                         throw e;
                     }
 

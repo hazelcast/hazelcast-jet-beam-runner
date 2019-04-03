@@ -19,6 +19,7 @@ package com.hazelcast.jet.beam.processors;
 import com.hazelcast.jet.Traverser;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
+import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
@@ -31,6 +32,7 @@ import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -44,7 +46,7 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
     private final String ownerId; //do not remove, useful for debugging
 
     private final Map<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>> windowToKeyToList = new HashMap<>();
-    private Traverser<WindowedValue<KV<K, List<T>>>> completionTraverser;
+    private Traverser<Object> flushTraverser;
 
     private WindowGroupP(WindowingStrategy<T, BoundedWindow> windowingStrategy, String ownerId) {
         this.windowingStrategy = windowingStrategy;
@@ -70,14 +72,41 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
     }
 
     @Override
+    public boolean tryProcessWatermark(@Nonnull Watermark watermark) {
+        return flush(watermark.timestamp(), true);
+    }
+
+    @Override
     public boolean complete() {
-        if (completionTraverser == null) {
+        return flush(Long.MAX_VALUE, false);
+    }
+
+    private boolean flush(long timestamp, boolean appendWatermark) {
+        if (flushTraverser == null) {
             mergeWindows();
-            completionTraverser = traverseStream(windowToKeyToList.entrySet().stream())
+            Iterator<Map.Entry<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>>> iterator =
+                    windowToKeyToList.entrySet().iterator();
+
+            // this traverses windowToKeyToList while filtering non-future items and
+            Traverser<Map.Entry<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>>> windowTraverser = () -> {
+                while (iterator.hasNext()) {
+                    Entry<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>> next = iterator.next();
+                    if (next.getKey().maxTimestamp().getMillis() < timestamp - 1) {
+                        iterator.remove();
+                        return next;
+                    }
+                }
+                return null;
+            };
+            flushTraverser = windowTraverser
                     .flatMap(mainEntry -> traverseStream(mainEntry.getValue().entrySet().stream())
-                            .map(e -> createOutput(e.getKey(), mainEntry.getKey(), e.getValue())));
+                            .map(e -> (Object) createOutput(e.getKey(), mainEntry.getKey(), e.getValue())))
+                    .onFirstNull(() -> flushTraverser = null);
+            if (appendWatermark) {
+                flushTraverser = flushTraverser.append(new Watermark(timestamp));
+            }
         }
-        return emitFromTraverser(completionTraverser);
+        return emitFromTraverser(flushTraverser);
     }
 
     private void mergeWindows() {
@@ -87,7 +116,7 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
         try {
             windowingStrategy.getWindowFn().mergeWindows(windowingStrategy.getWindowFn().new MergeContext() {
                 @Override
-                public Collection windows() {
+                public Collection<BoundedWindow> windows() {
                     return windowToKeyToList.keySet();
                 }
 
