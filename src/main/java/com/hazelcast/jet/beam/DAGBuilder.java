@@ -67,7 +67,7 @@ public class DAGBuilder {
         return dag;
     }
 
-    void registerConstructionListeners(WiringListener listener) {
+    public void registerConstructionListeners(WiringListener listener) {
         listeners.add(listener);
     }
 

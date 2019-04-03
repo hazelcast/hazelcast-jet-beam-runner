@@ -18,20 +18,28 @@ package com.hazelcast.jet.beam.portability;
 
 import com.hazelcast.jet.beam.DAGBuilder;
 import com.hazelcast.jet.beam.JetTranslationContext;
+import com.hazelcast.jet.beam.processors.AssignWindowP;
+import com.hazelcast.jet.beam.processors.FlattenP;
 import com.hazelcast.jet.beam.processors.ImpulseP;
+import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.Vertex;
-import com.hazelcast.jet.core.processor.Processors;
 import org.apache.beam.model.pipeline.v1.RunnerApi;
 import org.apache.beam.runners.core.construction.PTransformTranslation;
 import org.apache.beam.runners.core.construction.graph.ExecutableStage;
 import org.apache.beam.runners.core.construction.graph.PipelineNode;
+import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
+import org.apache.beam.sdk.transforms.windowing.DefaultTrigger;
+import org.apache.beam.sdk.transforms.windowing.Never;
+import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.ImmutableMap;
 
+import java.util.Collection;
 import java.util.Map;
 
 class PTransformTranslators {
 
     private static final Map<String, PTransformTranslator> TRANSLATORS;
+
     static {
         ImmutableMap.Builder<String, PTransformTranslator> builder = ImmutableMap.builder();
         builder.put(PTransformTranslation.FLATTEN_TRANSFORM_URN, new FlattenTranslator());
@@ -43,7 +51,7 @@ class PTransformTranslators {
         TRANSLATORS = builder.build();
     }
 
-    static void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationContext translationContext) {
+    static void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationPortabilityContext translationContext) {
         TRANSLATORS
                 .getOrDefault(
                         transform.getTransform().getSpec().getUrn(),
@@ -60,20 +68,28 @@ class PTransformTranslators {
 
     private static class ExecutableStageTranslator implements PTransformTranslator {
         @Override
-        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationContext context) {
-            RunnerApi.ExecutableStagePayload executionStagePayload = PortabilityUtils.getExecutionStagePayload(transform);
-            Map.Entry<String, String> input = PortabilityUtils.getInput(transform);
-            Map<String, String> outputs = PortabilityUtils.getOutputs(transform);
+        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationPortabilityContext context) {
+            RunnerApi.ExecutableStagePayload stagePayload = PortabilityUtils.getExecutionStagePayload(transform);
+
+            String input = PortabilityUtils.getInput(transform);
+            Collection<String> outputs = PortabilityUtils.getOutputs(transform);
 
             String transformName = transform.getId();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
 
-            Vertex vertex = dagBuilder.addVertex(vertexId, Processors.noopP()); //todo: dummy processor!
+            ExecuteStageP.Supplier processorSupplier = new ExecuteStageP.Supplier(
+                    stagePayload,
+                    context.getJobInfo(),
+                    outputs,
+                    vertexId
+            );
+            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
+            dagBuilder.registerConstructionListeners(processorSupplier);
 
-            dagBuilder.registerEdgeEndPoint(input.getValue(), vertex);
+            dagBuilder.registerEdgeEndPoint(input, vertex);
 
-            for (String edgeId : outputs.values()) {
+            for (String edgeId : outputs) {
                 dagBuilder.registerCollectionOfEdge(edgeId, edgeId);
                 dagBuilder.registerEdgeStartPoint(edgeId, vertex);
             }
@@ -82,49 +98,94 @@ class PTransformTranslators {
 
     private static class ReshuffleTranslator implements PTransformTranslator {
         @Override
-        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationContext context) {
-            System.out.println(); //todo: remove
-            //todo
+        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationPortabilityContext context) {
+            throw new UnsupportedOperationException("Reshuffle nodes aren't implemented yet!");
+            //todo: we should cut out reshuffle nodes completely from the pipeline, explicitly reshuffling doesn't make sense in Jet (Jet does it implicitly all the time)
         }
     }
 
     private static class GroupByKeyTranslator implements PTransformTranslator {
         @Override
-        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationContext context) {
-            System.out.println(); //todo: remove
-            //todo
+        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationPortabilityContext context) {
+            String transformName = transform.getId();
+
+            String input = PortabilityUtils.getInput(transform);
+            String output = PortabilityUtils.getOutput(transform);
+
+            WindowingStrategy<Object, BoundedWindow> windowingStrategy = PortabilityUtils.getWindowingStrategy(pipeline, output);
+            if (!windowingStrategy.getTrigger().isCompatible(DefaultTrigger.of()) && !windowingStrategy.getTrigger().isCompatible(Never.ever())) {
+                throw new UnsupportedOperationException("Only DefaultTrigger and Never.NeverTrigger supported, got " + windowingStrategy.getTrigger());
+            }
+            if (windowingStrategy.getAllowedLateness().getMillis() != 0) {
+                throw new UnsupportedOperationException("Non-zero allowed lateness not supported");
+            }
+
+            DAGBuilder dagBuilder = context.getDagBuilder();
+            String vertexId = dagBuilder.newVertexId(transformName);
+            Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(windowingStrategy, vertexId));
+
+            dagBuilder.registerEdgeEndPoint(input, vertex);
+
+            dagBuilder.registerCollectionOfEdge(output, output);
+            dagBuilder.registerEdgeStartPoint(output, vertex);
         }
+
     }
 
     private static class FlattenTranslator implements PTransformTranslator {
         @Override
-        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationContext context) {
-            System.out.println(); //todo: remove
-            //todo
+        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationPortabilityContext context) {
+            String transformName = transform.getId();
+
+            DAGBuilder dagBuilder = context.getDagBuilder();
+            String vertexId = dagBuilder.newVertexId(transformName);
+            Vertex vertex = dagBuilder.addVertex(vertexId, FlattenP.supplier(vertexId));
+
+            Collection<String> inputs = PortabilityUtils.getInputs(transform);
+            for (String inputCollectionId : inputs) {
+                dagBuilder.registerEdgeEndPoint(inputCollectionId, vertex);
+            }
+
+            String output = PortabilityUtils.getOutput(transform);
+            dagBuilder.registerCollectionOfEdge(output, output);
+            dagBuilder.registerEdgeStartPoint(output, vertex);
         }
     }
 
     private static class WindowTranslator implements PTransformTranslator {
         @Override
-        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationContext context) {
-            System.out.println(); //todo: remove
-            //todo
+        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationPortabilityContext context) {
+            String transformName = transform.getId();
+
+            String input = PortabilityUtils.getInput(transform);
+            String output = PortabilityUtils.getOutput(transform);
+
+            WindowingStrategy<Object, BoundedWindow> windowingStrategy = PortabilityUtils.getWindowingStrategy(pipeline, output);
+
+            DAGBuilder dagBuilder = context.getDagBuilder();
+            String vertexId = dagBuilder.newVertexId(transformName);
+
+            Vertex vertex = dagBuilder.addVertex(vertexId, AssignWindowP.supplier(windowingStrategy, vertexId));
+
+            dagBuilder.registerEdgeEndPoint(input, vertex);
+
+            dagBuilder.registerCollectionOfEdge(output, output);
+            dagBuilder.registerEdgeStartPoint(output, vertex);
         }
     }
 
     private static class ImpulseTranslator implements PTransformTranslator {
         @Override
-        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationContext context) {
+        public void translate(PipelineNode.PTransformNode transform, RunnerApi.Pipeline pipeline, JetTranslationPortabilityContext context) {
             String transformName = transform.getId();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
 
             Vertex vertex = dagBuilder.addVertex(vertexId, ImpulseP.supplier(vertexId));
 
-            Map.Entry<String, String> output = PortabilityUtils.getOutput(transform);
-            String outputEdgeId = output.getValue();
-            dagBuilder.registerCollectionOfEdge(outputEdgeId, outputEdgeId);
-            dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
+            String output = PortabilityUtils.getOutput(transform);
+            dagBuilder.registerCollectionOfEdge(output, output);
+            dagBuilder.registerEdgeStartPoint(output, vertex);
         }
     }
 

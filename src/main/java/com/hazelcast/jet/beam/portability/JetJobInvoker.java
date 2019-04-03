@@ -55,6 +55,6 @@ class JetJobInvoker implements JobInvoker {
             portableOptions.setSdkWorkerParallelism(configuration.getSdkWorkerParallelism());
         }
 
-        return new JetJobInvocation(invocationId, executor, pipeline, jetPipelineOptions);
+        return new JetJobInvocation(invocationId, retrievalToken, executor, pipeline, jetPipelineOptions);
     }
 }

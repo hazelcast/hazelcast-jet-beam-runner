@@ -17,33 +17,37 @@
 package com.hazelcast.jet.beam.portability;
 
 import org.apache.beam.model.pipeline.v1.RunnerApi;
+import org.apache.beam.runners.core.construction.RehydratedComponents;
+import org.apache.beam.runners.core.construction.WindowingStrategyTranslation;
 import org.apache.beam.runners.core.construction.graph.PipelineNode;
+import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
+import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.grpc.v1p13p1.com.google.protobuf.ByteString;
 import org.apache.beam.vendor.grpc.v1p13p1.com.google.protobuf.InvalidProtocolBufferException;
 
-import java.util.Map;
+import java.util.Collection;
 
 class PortabilityUtils {
 
-    static Map.Entry<String, String> getOutput(PipelineNode.PTransformNode transform) {
-        return asSingleEntry(getOutputs(transform));
+    static String getOutput(PipelineNode.PTransformNode transform) {
+        return asSingleString(getOutputs(transform));
     }
 
-    static Map<String, String> getOutputs(PipelineNode.PTransformNode transform) {
-        return transform.getTransform().getOutputsMap();
+    static Collection<String> getOutputs(PipelineNode.PTransformNode transform) {
+        return transform.getTransform().getOutputsMap().values();
     }
 
-    static Map.Entry<String, String> getInput(PipelineNode.PTransformNode transform) {
-        return asSingleEntry(getInputs(transform));
+    static String getInput(PipelineNode.PTransformNode transform) {
+        return asSingleString(getInputs(transform));
     }
 
-    static Map<String, String> getInputs(PipelineNode.PTransformNode transform) {
-        return transform.getTransform().getInputsMap();
+    static Collection<String> getInputs(PipelineNode.PTransformNode transform) {
+        return transform.getTransform().getInputsMap().values();
     }
 
-    private static Map.Entry<String, String> asSingleEntry(Map<String, String> map) {
+    private static String asSingleString(Collection<String> map) {
         if (map.size() != 1) throw new RuntimeException("Oops!");
-        return map.entrySet().iterator().next();
+        return map.iterator().next();
     }
 
     static RunnerApi.ExecutableStagePayload getExecutionStagePayload(PipelineNode.PTransformNode transform) {
@@ -52,6 +56,20 @@ class PortabilityUtils {
             return RunnerApi.ExecutableStagePayload.parseFrom(payload);
         } catch (InvalidProtocolBufferException e) {
             throw new RuntimeException("Oops!", e);
+        }
+    }
+
+    static WindowingStrategy<Object, BoundedWindow> getWindowingStrategy(RunnerApi.Pipeline pipeline, String collectionId) {
+        RunnerApi.PCollection pCollection = pipeline.getComponents().getPcollectionsOrThrow(collectionId);
+        String windowingStrategyId = pCollection.getWindowingStrategyId();
+        RunnerApi.WindowingStrategy windowingStrategyProto = pipeline.getComponents().getWindowingStrategiesOrThrow(windowingStrategyId);
+
+        RehydratedComponents rehydratedComponents = RehydratedComponents.forComponents(pipeline.getComponents());
+
+        try {
+            return (WindowingStrategy<Object, BoundedWindow>) WindowingStrategyTranslation.fromProto(windowingStrategyProto, rehydratedComponents);
+        } catch (InvalidProtocolBufferException e) {
+            throw new IllegalStateException(String.format("Unable to hydrate GroupByKey windowing strategy %s.", windowingStrategyProto), e);
         }
     }
 }

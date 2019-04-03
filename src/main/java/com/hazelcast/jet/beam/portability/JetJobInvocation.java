@@ -23,17 +23,18 @@ import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.beam.JetPipelineOptions;
 import com.hazelcast.jet.beam.JetPipelineResult;
-import com.hazelcast.jet.beam.JetTranslationContext;
 import com.hazelcast.jet.beam.metrics.JetMetricsContainer;
 import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.core.DAG;
 import org.apache.beam.model.pipeline.v1.RunnerApi;
+import org.apache.beam.runners.core.construction.PipelineOptionsTranslation;
 import org.apache.beam.runners.core.construction.graph.ExecutableStage;
 import org.apache.beam.runners.core.construction.graph.GreedyPipelineFuser;
 import org.apache.beam.runners.core.construction.graph.PipelineNode;
 import org.apache.beam.runners.core.construction.graph.QueryablePipeline;
 import org.apache.beam.runners.core.metrics.MetricUpdates;
 import org.apache.beam.runners.fnexecution.jobsubmission.JobInvocation;
+import org.apache.beam.runners.fnexecution.provisioning.JobInfo;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.util.concurrent.FutureCallback;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.util.concurrent.Futures;
@@ -61,7 +62,7 @@ public class JetJobInvocation implements JobInvocation {
     private final String id;
     private final ListeningExecutorService executorService;
     private final RunnerApi.Pipeline pipeline;
-    private final JetTranslationContext translationContext;
+    private final JetTranslationPortabilityContext translationContext;
     private final List<Consumer<JobState.Enum>> stateObservers = new ArrayList<>(); //todo: when should it be cleaned up?
     private final List<Consumer<JobMessage>> messageObservers = new ArrayList<>(); //todo: when should it be cleaned up?
 
@@ -70,6 +71,7 @@ public class JetJobInvocation implements JobInvocation {
 
     JetJobInvocation(
             String id,
+            String retrievalToken,
             ListeningExecutorService executorService,
             RunnerApi.Pipeline pipeline,
             JetPipelineOptions pipelineOptions
@@ -77,7 +79,15 @@ public class JetJobInvocation implements JobInvocation {
         this.id = id;
         this.executorService = executorService;
         this.pipeline = pipeline;
-        this.translationContext = new JetTranslationContext(pipelineOptions);
+        this.translationContext = new JetTranslationPortabilityContext(
+                pipelineOptions,
+                JobInfo.create(
+                        id,
+                        pipelineOptions.getJobName(),
+                        retrievalToken,
+                        PipelineOptionsTranslation.toProto(pipelineOptions)
+                )
+        );
         this.invocationFuture = null;
         this.jobState = JobState.Enum.STOPPED;
     }
@@ -202,7 +212,7 @@ public class JetJobInvocation implements JobInvocation {
 
         QueryablePipeline p = QueryablePipeline.forTransforms(fusedPipeline.getRootTransformIdsList(), fusedPipeline.getComponents());
         for (PipelineNode.PTransformNode transform : p.getTopologicallyOrderedTransforms()) {
-            PTransformTranslators.translate(transform, pipeline, translationContext);
+            PTransformTranslators.translate(transform, fusedPipeline, translationContext);
         }
 
         return translationContext.getDagBuilder().getDag();

@@ -46,7 +46,7 @@ import java.util.Map;
 public abstract class AbstractTransformTest implements Serializable { //has to be set Serializable because the way how side inputs are being used via capturing lambdas
 
     @Rule
-    public transient Timeout globalTimeout = Timeout.seconds(1000); // 10 seconds max per method tested
+    public transient Timeout globalTimeout = Timeout.seconds(120); // 10 seconds max per method tested
 
     @Rule
     public transient TestPipeline pipeline = getTestPipeline();
@@ -81,6 +81,10 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
 
         SdkHarnessOptions sdkHarnessOptions = options.as(SdkHarnessOptions.class);
         sdkHarnessOptions.setDefaultSdkHarnessLogLevel(SdkHarnessOptions.LogLevel.INFO);
+
+        JetPipelineOptions jetOptions = options.as(JetPipelineOptions.class);
+        jetOptions.setJetGroupName(JetConfig.DEFAULT_GROUP_NAME);
+        jetOptions.setJetLocalParallelism(1);
     }
 
     private static JetTestInstanceFactory factory = new JetTestInstanceFactory();
