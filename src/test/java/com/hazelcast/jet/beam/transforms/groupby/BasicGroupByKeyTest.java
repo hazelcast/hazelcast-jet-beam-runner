@@ -109,7 +109,7 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
     }
 
     @Test
-    @Ignore //todo: TestStream not handled (yet?)
+    @Ignore //todo advanceProcessingTime
     public void testCombiningAccumulatingProcessingTime() {
         PCollection<Integer> triggeredSums =
                 pipeline.apply(

@@ -33,6 +33,7 @@ import org.hamcrest.TypeSafeMatcher;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
+import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 
 import java.io.Serializable;
@@ -45,6 +46,8 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
 
     @Rule
     public transient TestPipeline pipeline = getTestPipeline();
+
+    @Rule public transient ExpectedException thrown = ExpectedException.none();
 
     private static TestPipeline getTestPipeline() {
         PipelineOptions options = PipelineOptionsFactory.create();

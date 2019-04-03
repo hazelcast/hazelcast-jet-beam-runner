@@ -23,6 +23,7 @@ import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
+import org.apache.beam.sdk.transforms.windowing.TimestampCombiner;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.WindowingStrategy;
@@ -152,10 +153,11 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
         assert !windowedValues.isEmpty() : "empty windowedValues";
         Instant timestamp = null;
         List<T> values = new ArrayList<>(windowedValues.size());
+        TimestampCombiner timestampCombiner = windowingStrategy.getTimestampCombiner();
         for (WindowedValue<KV<K, T>> windowedValue : windowedValues) {
             if (!PaneInfo.NO_FIRING.equals(windowedValue.getPane())) throw new RuntimeException("Oops!");
             timestamp = timestamp == null ? windowedValue.getTimestamp()
-                    : windowingStrategy.getTimestampCombiner().combine(timestamp, windowedValue.getTimestamp());
+                    : timestampCombiner.merge(window, timestamp, windowedValue.getTimestamp());
             values.add(windowedValue.getValue().getValue());
         }
         return WindowedValue.of(KV.of(key, values), timestamp, window, PaneInfo.NO_FIRING);
