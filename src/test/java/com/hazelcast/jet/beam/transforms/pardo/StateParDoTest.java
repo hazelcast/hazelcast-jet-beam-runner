@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.pardo;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.AtomicCoder;
 import org.apache.beam.sdk.coders.BigEndianLongCoder;
 import org.apache.beam.sdk.coders.Coder;
@@ -108,7 +109,8 @@ public class StateParDoTest extends AbstractParDoTest {
                         .apply(ParDo.of(fn));
 
         PAssert.that(output).containsInAnyOrder(0, 1, 2);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -158,7 +160,8 @@ public class StateParDoTest extends AbstractParDoTest {
         PCollection<Integer> output = pipeline.apply(Create.of(input)).apply(ParDo.of(onePerKey));
 
         PAssert.that(output).containsInAnyOrder(expectedOutput);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -198,7 +201,8 @@ public class StateParDoTest extends AbstractParDoTest {
                 .apply(ParDo.of(fn))
                 .setCoder(ListCoder.of(myIntegerCoder));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -242,7 +246,8 @@ public class StateParDoTest extends AbstractParDoTest {
 
         PAssert.that(output).inWindow(firstWindow).containsInAnyOrder(0, 1, 2);
         PAssert.that(output).inWindow(secondWindow).containsInAnyOrder(0, 1);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -293,7 +298,8 @@ public class StateParDoTest extends AbstractParDoTest {
         PAssert.that(intermediate)
                 .containsInAnyOrder(KV.of("sizzle", 0), KV.of("sizzle", 1), KV.of("sizzle", 2));
         PAssert.that(output).containsInAnyOrder(13, 26, 39);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -344,7 +350,8 @@ public class StateParDoTest extends AbstractParDoTest {
 
         // There are 1 and 3 from "hello" and just "1" from "goodbye"
         PAssert.that(odds).containsInAnyOrder(1, 3, 1);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -392,7 +399,8 @@ public class StateParDoTest extends AbstractParDoTest {
                         .apply(ParDo.of(fn));
 
         PAssert.that(output).containsInAnyOrder(Lists.newArrayList(12, 42, 84, 97));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -445,7 +453,8 @@ public class StateParDoTest extends AbstractParDoTest {
                         .apply(ParDo.of(fn));
 
         PAssert.that(output).containsInAnyOrder(Sets.newHashSet(97, 42, 12));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -501,7 +510,8 @@ public class StateParDoTest extends AbstractParDoTest {
                         .apply(ParDo.of(fn));
 
         PAssert.that(output).containsInAnyOrder(KV.of("a", 97), KV.of("b", 42), KV.of("c", 12));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -539,7 +549,8 @@ public class StateParDoTest extends AbstractParDoTest {
 
         // There should only be one moment at which the average is exactly 0.5
         PAssert.that(output).containsInAnyOrder("right on");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -575,7 +586,8 @@ public class StateParDoTest extends AbstractParDoTest {
 
         // There should only be one moment at which the sum is exactly 8
         PAssert.that(output).containsInAnyOrder("right on");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -626,7 +638,8 @@ public class StateParDoTest extends AbstractParDoTest {
 
         PAssert.that(output)
                 .containsInAnyOrder(Lists.newArrayList(12, 42, 84, 97), Lists.newArrayList(0, 1, 2));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     static class CountSum<NumT extends Number> implements Combine.AccumulatingCombineFn.Accumulator<NumT, CountSum<NumT>, Double> {

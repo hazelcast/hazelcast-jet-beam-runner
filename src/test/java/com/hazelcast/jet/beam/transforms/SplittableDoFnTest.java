@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
@@ -132,7 +133,8 @@ public class SplittableDoFnTest extends AbstractTransformTest {
                                 KV.of("ccccc", 3),
                                 KV.of("ccccc", 4)));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -199,7 +201,8 @@ public class SplittableDoFnTest extends AbstractTransformTest {
 
             PAssert.that(timestamped).inWindow(window).containsInAnyOrder(expected);
         }
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static class SDFWithMultipleOutputsPerBlockBase extends DoFn<String, Integer> {
@@ -278,7 +281,8 @@ public class SplittableDoFnTest extends AbstractTransformTest {
                         .apply(Window.<Integer>configure().triggering(Never.ever()).discardingFiredPanes());
         PAssert.thatSingleton(outputs.apply(Count.globally()))
                 .isEqualTo((long) SDFWithMultipleOutputsPerBlockBase.MAX_INDEX);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static PairStringWithIndexToLengthBase pairStringWithIndexToLengthFn(IsBounded bounded) {
@@ -316,7 +320,8 @@ public class SplittableDoFnTest extends AbstractTransformTest {
 
         PAssert.that(res).containsInAnyOrder(Arrays.asList("foo:0", "foo:1", "foo:2"));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -360,7 +365,8 @@ public class SplittableDoFnTest extends AbstractTransformTest {
 
         PAssert.that(res).containsInAnyOrder("a:0", "a:1", "a:2", "a:3", "b:4", "b:5", "b:6", "b:7");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static class SDFWithSideInputBase extends DoFn<Integer, String> {
@@ -527,7 +533,8 @@ public class SplittableDoFnTest extends AbstractTransformTest {
                             }
                             return null;
                         });
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
 
         // TODO: also test coverage when some of the windows of the side input are not ready.
     }
@@ -600,7 +607,8 @@ public class SplittableDoFnTest extends AbstractTransformTest {
         PAssert.that(res.get(additionalOutputTag))
                 .containsInAnyOrder(Arrays.asList("additional:0", "additional:1", "additional:2"));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test(timeout = 15000L)
@@ -642,7 +650,8 @@ public class SplittableDoFnTest extends AbstractTransformTest {
         assertEquals(afterSDF.getWindowingStrategy(), input.getWindowingStrategy());
         PAssert.that(nonLate).containsInAnyOrder("aa");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static class SDFWithLifecycleBase extends DoFn<String, String> {
@@ -727,7 +736,8 @@ public class SplittableDoFnTest extends AbstractTransformTest {
         PCollection<String> res =
                 pipeline.apply(Create.of("a", "b", "c")).apply(ParDo.of(sdfWithLifecycle(bounded)));
         PAssert.that(res).containsInAnyOrder("a", "b", "c");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

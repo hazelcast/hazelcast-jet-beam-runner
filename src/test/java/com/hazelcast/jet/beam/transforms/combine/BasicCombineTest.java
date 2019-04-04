@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.combine;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.VarIntCoder;
 import org.apache.beam.sdk.testing.PAssert;
@@ -47,6 +48,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.apache.beam.sdk.transforms.display.DisplayDataMatchers.hasDisplayItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.junit.Assert.assertThat;
@@ -115,7 +117,8 @@ public class BasicCombineTest extends AbstractCombineTest {
         PAssert.that(hotMean).containsInAnyOrder(expected);
         PAssert.that(splitMean).containsInAnyOrder(expected);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -140,7 +143,8 @@ public class BasicCombineTest extends AbstractCombineTest {
                             return null;
                         });
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -208,7 +212,8 @@ public class BasicCombineTest extends AbstractCombineTest {
                                         }));
 
         PAssert.that(output).containsInAnyOrder(KV.of("a", 4), KV.of("b", 2), KV.of("c", 4));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     /**
@@ -223,7 +228,8 @@ public class BasicCombineTest extends AbstractCombineTest {
                         .apply(Combine.perKey(new Summer()::sum));
 
         PAssert.that(output).containsInAnyOrder(KV.of("a", 4), KV.of("b", 2), KV.of("c", 4));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private void runTestSimpleCombine(
@@ -238,7 +244,8 @@ public class BasicCombineTest extends AbstractCombineTest {
         PAssert.that(sum).containsInAnyOrder(globalSum);
         PAssert.that(sumPerKey).containsInAnyOrder(perKeyCombines);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private void runTestBasicCombine(
@@ -256,7 +263,8 @@ public class BasicCombineTest extends AbstractCombineTest {
         PAssert.that(unique).containsInAnyOrder(globalUnique);
         PAssert.that(uniquePerKey).containsInAnyOrder(perKeyUnique);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static <T> PCollection<T> copy(PCollection<T> pc, final int n) {

@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -27,6 +28,8 @@ import org.apache.beam.sdk.values.PCollection;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
 import org.junit.Test;
+
+import static junit.framework.TestCase.assertEquals;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.WithTimestampsTest */
 @SuppressWarnings("ALL")
@@ -62,7 +65,8 @@ public class WithTimestampsTest extends AbstractTransformTest {
                         KV.of(Integer.toString(Integer.MAX_VALUE), new Instant(Integer.MAX_VALUE)),
                         KV.of(yearTwoThousand, new Instant(Long.valueOf(yearTwoThousand))));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -104,7 +108,8 @@ public class WithTimestampsTest extends AbstractTransformTest {
                                 new Instant(Long.valueOf(Integer.MAX_VALUE)).minus(skew)),
                         KV.of(yearTwoThousand, new Instant(Long.valueOf(yearTwoThousand)).minus(skew)));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -134,7 +139,8 @@ public class WithTimestampsTest extends AbstractTransformTest {
                         KV.of(Integer.toString(Integer.MAX_VALUE), new Instant(Integer.MAX_VALUE)),
                         KV.of(yearTwoThousand, new Instant(Long.valueOf(yearTwoThousand))));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

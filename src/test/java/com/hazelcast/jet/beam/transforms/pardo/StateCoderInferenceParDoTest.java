@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.pardo;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.ListCoder;
@@ -46,6 +47,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static junit.framework.TestCase.assertEquals;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.ParDoTest.StateCoderInferenceTests */
 @SuppressWarnings("ALL")
@@ -98,7 +101,8 @@ public class StateCoderInferenceParDoTest extends AbstractParDoTest {
                                 new MyInteger(12), new MyInteger(42),
                                 new MyInteger(84), new MyInteger(97)));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -138,7 +142,8 @@ public class StateCoderInferenceParDoTest extends AbstractParDoTest {
                 .apply(ParDo.of(fn))
                 .setCoder(ListCoder.of(myIntegerCoder));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -188,7 +193,8 @@ public class StateCoderInferenceParDoTest extends AbstractParDoTest {
         PAssert.that(output)
                 .containsInAnyOrder(
                         Sets.newHashSet(new MyInteger(97), new MyInteger(42), new MyInteger(12)));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -233,7 +239,8 @@ public class StateCoderInferenceParDoTest extends AbstractParDoTest {
                 .apply(ParDo.of(fn))
                 .setCoder(SetCoder.of(myIntegerCoder));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -286,7 +293,8 @@ public class StateCoderInferenceParDoTest extends AbstractParDoTest {
                         KV.of("a", new MyInteger(97)),
                         KV.of("b", new MyInteger(42)),
                         KV.of("c", new MyInteger(12)));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -336,7 +344,8 @@ public class StateCoderInferenceParDoTest extends AbstractParDoTest {
                 .apply(ParDo.of(fn))
                 .setCoder(KvCoder.of(StringUtf8Coder.of(), myIntegerCoder));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -399,7 +408,8 @@ public class StateCoderInferenceParDoTest extends AbstractParDoTest {
 
         // There should only be one moment at which the average is exactly 16
         PAssert.that(output).containsInAnyOrder("right on");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -461,7 +471,8 @@ public class StateCoderInferenceParDoTest extends AbstractParDoTest {
                 .apply(Create.of(KV.of("hello", 3), KV.of("hello", 6), KV.of("hello", 7)))
                 .apply(ParDo.of(fn));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

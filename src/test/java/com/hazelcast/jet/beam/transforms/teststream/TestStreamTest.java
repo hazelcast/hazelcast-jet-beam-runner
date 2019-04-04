@@ -17,6 +17,7 @@
 package com.hazelcast.jet.beam.transforms.teststream;
 
 import com.hazelcast.jet.beam.transforms.AbstractTransformTest;
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.coders.VarIntCoder;
 import org.apache.beam.sdk.coders.VarLongCoder;
@@ -58,6 +59,7 @@ import org.junit.rules.ExpectedException;
 
 import java.util.stream.StreamSupport;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
@@ -134,7 +136,8 @@ public class TestStreamTest extends AbstractTransformTest {
                            return null;
                        });
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -166,7 +169,8 @@ public class TestStreamTest extends AbstractTransformTest {
 
         PAssert.that(sum).inEarlyGlobalWindowPanes().containsInAnyOrder(3L, 6L);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -216,7 +220,8 @@ public class TestStreamTest extends AbstractTransformTest {
                .inFinalPane(window)
                .containsInAnyOrder("finalLatePane", "alsoFinalLatePane");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -250,7 +255,8 @@ public class TestStreamTest extends AbstractTransformTest {
                .inWindow(windowFn.assignWindow(new Instant(100)))
                .containsInAnyOrder("onTime");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -276,7 +282,8 @@ public class TestStreamTest extends AbstractTransformTest {
         PAssert.that(windowedValues)
                .inWindow(windows.assignWindow(endOfGlobalWindow))
                .containsInAnyOrder("foo", "bar");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -309,7 +316,8 @@ public class TestStreamTest extends AbstractTransformTest {
                                  .accumulatingFiredPanes());
         PAssert.that(createInts).containsInAnyOrder(1, 2, 3, 4);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test

@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.combine;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.AtomicCoder;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.Coder;
@@ -52,6 +53,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.CombineFnsTest */
@@ -104,7 +106,8 @@ public class ComposedCombineTest extends AbstractCombineTest {
         PAssert.that(combineGlobally).containsInAnyOrder(KV.of("global", KV.of(13, "111134")));
         PAssert.that(combinePerKey)
                 .containsInAnyOrder(KV.of("a", KV.of(4, "114")), KV.of("b", KV.of(13, "113")));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -164,7 +167,8 @@ public class ComposedCombineTest extends AbstractCombineTest {
         PAssert.that(combineGlobally).containsInAnyOrder(KV.of("global", KV.of(13, "111134I")));
         PAssert.that(combinePerKey)
                 .containsInAnyOrder(KV.of("a", KV.of(4, "114I")), KV.of("b", KV.of(13, "113I")));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -206,7 +210,8 @@ public class ComposedCombineTest extends AbstractCombineTest {
         PAssert.that(combinePerKey)
                 .containsInAnyOrder(
                         KV.of("a", KV.of(4, null)), KV.of("b", KV.of(13, null)));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static class UserString implements Serializable {

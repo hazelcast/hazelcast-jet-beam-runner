@@ -51,7 +51,8 @@ public class AssignWindowP<InputT> extends AbstractProcessor {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            traverser.accept(WindowedValue.of(item.getValue(), item.getTimestamp(), windows, item.getPane()));
+            WindowedValue<InputT> w = WindowedValue.of(item.getValue(), item.getTimestamp(), windows, item.getPane());
+            traverser.accept(w);
             return traverser;
         });
     }

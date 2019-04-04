@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.SerializableCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.testing.PAssert;
@@ -38,7 +39,8 @@ public class CreateTest extends AbstractTransformTest {
         PCollection<String> output = pipeline.apply(Create.of(LINES));
 
         PAssert.that(output).containsInAnyOrder(LINES_ARRAY);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -48,7 +50,8 @@ public class CreateTest extends AbstractTransformTest {
         PAssert.that(output).containsInAnyOrder(NO_LINES_ARRAY);
 
         assertEquals(StringUtf8Coder.of(), output.getCoder());
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -58,14 +61,16 @@ public class CreateTest extends AbstractTransformTest {
                         Create.of(null, "test1", null, "test2", null)
                                 .withCoder(SerializableCoder.of(String.class)));
         PAssert.that(output).containsInAnyOrder(null, "test1", null, "test2", null);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
     public void testCreateWithVoidType() throws Exception {
         PCollection<Void> output = pipeline.apply(Create.of(null, (Void) null));
         PAssert.that(output).containsInAnyOrder(null, null);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -76,7 +81,8 @@ public class CreateTest extends AbstractTransformTest {
         PAssert.that(output)
                 .containsInAnyOrder(KV.of(null, null), KV.of(null, null));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

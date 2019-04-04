@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.pardo;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.options.PipelineOptions;
@@ -52,6 +53,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.junit.Assert.fail;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.ParDoTest.TimerTests */
@@ -88,7 +90,8 @@ public class TimerParDoTest extends AbstractParDoTest {
         PCollection<Integer> output =
                 pipeline.apply(Create.of(KV.of("hello", 37))).apply(ParDo.of(fn));
         PAssert.that(output).containsInAnyOrder(3, 42);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -123,7 +126,8 @@ public class TimerParDoTest extends AbstractParDoTest {
                         .apply(GroupByKey.create())
                         .apply(ParDo.of(fn));
         PAssert.that(output).containsInAnyOrder(3, 42);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -159,7 +163,8 @@ public class TimerParDoTest extends AbstractParDoTest {
                 .containsInAnyOrder(
                         KV.of(3, BoundedWindow.TIMESTAMP_MIN_VALUE),
                         KV.of(42, BoundedWindow.TIMESTAMP_MIN_VALUE.plus(1774)));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -204,7 +209,8 @@ public class TimerParDoTest extends AbstractParDoTest {
                                 new Instant(0).minus(Duration.standardMinutes(1)), Duration.standardMinutes(3)),
                         new IntervalWindow(
                                 new Instant(0).minus(Duration.standardMinutes(2)), Duration.standardMinutes(3)));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -234,7 +240,8 @@ public class TimerParDoTest extends AbstractParDoTest {
         PCollection<Integer> output =
                 pipeline.apply(Create.of(KV.of("hello", 37))).apply(ParDo.of(fn));
         PAssert.that(output).containsInAnyOrder(3, 42);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -279,7 +286,8 @@ public class TimerParDoTest extends AbstractParDoTest {
                 pipeline.apply(Create.of(KV.of("hello", 42))).apply(ParDo.of(fn));
 
         PAssert.that(output).containsInAnyOrder(0, 1, 2, 3, 4);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -341,7 +349,8 @@ public class TimerParDoTest extends AbstractParDoTest {
         PCollection<KV<String, Integer>> output =
                 pipeline.apply(Create.of(input)).apply(ParDo.of(fn));
         PAssert.that(output).containsInAnyOrder(expectedOutput);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -378,7 +387,8 @@ public class TimerParDoTest extends AbstractParDoTest {
                 };
 
         pipeline.apply(Create.of(KV.of("hello", 37))).apply(ParDo.of(fn));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -415,7 +425,8 @@ public class TimerParDoTest extends AbstractParDoTest {
                 };
 
         pipeline.apply(Create.of(KV.of("hello", 37))).apply(ParDo.of(fn));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -452,7 +463,8 @@ public class TimerParDoTest extends AbstractParDoTest {
         // Timer "foo" is set twice because input1 and input 2 are outputted. However, only one
         // "timer_output" is outputted. Therefore, the timer is overwritten.
         PAssert.that(output).containsInAnyOrder("input1", "input2", "timer_output");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -489,7 +501,8 @@ public class TimerParDoTest extends AbstractParDoTest {
         // Timer "foo" is set twice because input1 and input 2 are outputted. However, only one
         // "timer_output" is outputted. Therefore, the timer is overwritten.
         PAssert.that(output).containsInAnyOrder("input1", "input2", "timer_output");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -522,7 +535,8 @@ public class TimerParDoTest extends AbstractParDoTest {
         pipeline.getOptions().as(MyOptions.class).setFakeOption(testOptionValue);
         PAssert.that(results).containsInAnyOrder("not fake anymore");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test

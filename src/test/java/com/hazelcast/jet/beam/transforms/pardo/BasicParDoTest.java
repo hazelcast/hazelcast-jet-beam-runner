@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.pardo;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.VarIntCoder;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.testing.PAssert;
@@ -30,6 +31,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static junit.framework.TestCase.assertEquals;
+
 /* "Inspired" by org.apache.beam.sdk.transforms.ParDoTest.BasicTests */
 @SuppressWarnings("ALL")
 public class BasicParDoTest extends AbstractParDoTest {
@@ -42,7 +45,8 @@ public class BasicParDoTest extends AbstractParDoTest {
                 pipeline.apply(Create.of(inputs)).apply(ParDo.of(new TestDoFn()));
 
         PAssert.that(output).satisfies(HasExpectedOutput.forInput(inputs));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -56,7 +60,8 @@ public class BasicParDoTest extends AbstractParDoTest {
 
         PAssert.that(output).satisfies(HasExpectedOutput.forInput(inputs));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -71,7 +76,8 @@ public class BasicParDoTest extends AbstractParDoTest {
 
         PAssert.that(output).empty();
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -95,7 +101,8 @@ public class BasicParDoTest extends AbstractParDoTest {
         // user-defined PTransforms.
         PAssert.that(output).satisfies(HasExpectedOutput.forInput(inputs));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -116,7 +123,8 @@ public class BasicParDoTest extends AbstractParDoTest {
         pipeline.getOptions().as(MyOptions.class).setFakeOption(testOptionValue);
         PAssert.that(results).containsInAnyOrder("not fake anymore");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

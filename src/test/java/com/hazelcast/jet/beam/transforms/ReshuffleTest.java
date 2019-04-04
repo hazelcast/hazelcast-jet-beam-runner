@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.coders.VarIntCoder;
@@ -80,7 +81,8 @@ public class ReshuffleTest extends AbstractTransformTest {
 
         assertEquals(input.getWindowingStrategy(), output.getWindowingStrategy());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     /**
@@ -125,7 +127,8 @@ public class ReshuffleTest extends AbstractTransformTest {
                             return null;
                         });
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -145,7 +148,8 @@ public class ReshuffleTest extends AbstractTransformTest {
 
         assertEquals(input.getWindowingStrategy(), output.getWindowingStrategy());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -165,7 +169,8 @@ public class ReshuffleTest extends AbstractTransformTest {
 
         assertEquals(input.getWindowingStrategy(), output.getWindowingStrategy());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -185,7 +190,8 @@ public class ReshuffleTest extends AbstractTransformTest {
 
         assertEquals(input.getWindowingStrategy(), output.getWindowingStrategy());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -204,7 +210,8 @@ public class ReshuffleTest extends AbstractTransformTest {
 
         assertEquals(input.getWindowingStrategy(), output.getWindowingStrategy());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -223,7 +230,8 @@ public class ReshuffleTest extends AbstractTransformTest {
 
         assertEquals(input.getWindowingStrategy(), output.getWindowingStrategy());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -246,7 +254,8 @@ public class ReshuffleTest extends AbstractTransformTest {
         PCollection<KV<String, Long>> reshuffled = input.apply(Reshuffle.of());
         PAssert.that(reshuffled.apply(Values.create())).containsInAnyOrder(0L, 1L, 2L);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static class AssertThatHasExpectedContents

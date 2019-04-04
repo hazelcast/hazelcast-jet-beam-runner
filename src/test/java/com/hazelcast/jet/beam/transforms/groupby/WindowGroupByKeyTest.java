@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.groupby;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
@@ -41,6 +42,8 @@ import org.junit.experimental.categories.Category;
 
 import java.util.Arrays;
 import java.util.List;
+
+import static junit.framework.TestCase.assertEquals;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.GroupByKeyTest.WindowTests */
 @SuppressWarnings("ALL")
@@ -84,7 +87,8 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
                .inWindow(new IntervalWindow(new Instant(5L), Duration.millis(5L)))
                .satisfies(containsKvs(kv("k1", 4), kv("k2", -33), kv("k3", 0)));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -114,7 +118,8 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
                .inWindow(new IntervalWindow(new Instant(3L), Duration.millis(5L)))
                .satisfies(containsKvs(kv("foo", 4), kv("bar", 3)));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -142,7 +147,8 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
                .inWindow(new IntervalWindow(new Instant(9L), new Instant(13L)))
                .satisfies(containsKvs(kv("foo", 9)));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -159,7 +165,8 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
 
         PCollection<KV<String, Iterable<Integer>>> output = input.apply(GroupByKey.create());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
 
         Assert.assertTrue(
                 output
@@ -182,7 +189,8 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
 
         PCollection<KV<String, Iterable<Integer>>> output = input.apply(GroupByKey.create());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
 
         Assert.assertTrue(
                 output

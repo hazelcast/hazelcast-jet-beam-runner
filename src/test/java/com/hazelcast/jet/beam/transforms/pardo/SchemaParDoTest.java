@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.pardo;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.schemas.FieldAccessDescriptor;
 import org.apache.beam.sdk.schemas.JavaFieldSchema;
 import org.apache.beam.sdk.schemas.Schema;
@@ -36,6 +37,7 @@ import org.junit.Test;
 import java.io.Serializable;
 import java.util.List;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.ParDoSchemaTest */
@@ -68,7 +70,8 @@ public class SchemaParDoTest extends AbstractParDoTest {
                                             }
                                         }));
         PAssert.that(output).containsInAnyOrder("a:1", "b:2", "c:3");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -119,7 +122,8 @@ public class SchemaParDoTest extends AbstractParDoTest {
                                             }
                                         }));
         PAssert.that(output).containsInAnyOrder("a:1", "b:2", "c:3");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -212,7 +216,8 @@ public class SchemaParDoTest extends AbstractParDoTest {
 
         PAssert.that(output1).containsInAnyOrder("a:1", "b:2", "c:3");
         PAssert.that(output2).containsInAnyOrder("a:1", "b:2", "c:3");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -256,7 +261,8 @@ public class SchemaParDoTest extends AbstractParDoTest {
                                             }
                                         }));
         PAssert.that(output).containsInAnyOrder("a:1", "b:2", "c:3");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -289,7 +295,8 @@ public class SchemaParDoTest extends AbstractParDoTest {
                                             }
                                         }));
         PAssert.that(output).containsInAnyOrder("a:1", "b:2", "c:3");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -310,7 +317,8 @@ public class SchemaParDoTest extends AbstractParDoTest {
                                             }
                                         }));
         PAssert.that(output).containsInAnyOrder("a:1", "b:2", "c:3");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -322,7 +330,8 @@ public class SchemaParDoTest extends AbstractParDoTest {
         PCollection<InferredPojo> out = pipeline.apply(Create.of(pojoList)).apply(Filter.by(e -> true));
         assertTrue(out.hasSchema());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     static class MyPojo implements Serializable {

@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.pardo;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.state.StateSpec;
@@ -30,6 +31,8 @@ import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.base.MoreObjects;
 import org.junit.Ignore;
 import org.junit.Test;
+
+import static junit.framework.TestCase.assertEquals;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.ParDoTest.TimerCoderInferenceTests */
 @SuppressWarnings("ALL")
@@ -68,7 +71,8 @@ public class TimerCoderInferenceParDoTest extends AbstractParDoTest {
                         .setCoder(myIntegerCoder);
 
         PAssert.that(output).containsInAnyOrder(new MyInteger(0), new MyInteger(1), new MyInteger(2));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -100,7 +104,8 @@ public class TimerCoderInferenceParDoTest extends AbstractParDoTest {
                 .apply(ParDo.of(fn))
                 .setCoder(myIntegerCoder);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -134,7 +139,8 @@ public class TimerCoderInferenceParDoTest extends AbstractParDoTest {
                 .apply(ParDo.of(fn))
                 .setCoder(myIntegerCoder);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

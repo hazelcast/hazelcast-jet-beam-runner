@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.pardo;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -29,6 +30,7 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.apache.beam.vendor.guava.v20_0.com.google.common.base.Preconditions.checkNotNull;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
@@ -57,7 +59,8 @@ public class TimestampParDoTest extends AbstractParDoTest {
                         "processing: 42, timestamp: -958",
                         "processing: 6, timestamp: -994");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -106,7 +109,8 @@ public class TimestampParDoTest extends AbstractParDoTest {
                             return null;
                         });
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     static class TestOutputTimestampDoFn<T extends Number> extends DoFn<T, T> {

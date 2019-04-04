@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -28,6 +29,7 @@ import org.apache.beam.sdk.values.TimestampedValue;
 import org.joda.time.Instant;
 import org.junit.Test;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
 
@@ -52,7 +54,8 @@ public class ReifyTimestampsTest extends AbstractTransformTest {
                         KV.of("bar", TimestampedValue.of(2, new Instant(2))),
                         KV.of("baz", TimestampedValue.of(3, new Instant(3))));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -83,7 +86,8 @@ public class ReifyTimestampsTest extends AbstractTransformTest {
                             }
                         }));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -118,7 +122,8 @@ public class ReifyTimestampsTest extends AbstractTransformTest {
                             }
                         }));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

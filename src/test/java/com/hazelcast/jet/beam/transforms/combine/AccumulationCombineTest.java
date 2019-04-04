@@ -1,5 +1,6 @@
 package com.hazelcast.jet.beam.transforms.combine;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.Combine;
 import org.apache.beam.sdk.transforms.Values;
@@ -10,6 +11,8 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+
+import static junit.framework.TestCase.assertEquals;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.CombineTest.AccumulationTests */
 @SuppressWarnings({"ALL"})
@@ -40,7 +43,8 @@ public class AccumulationCombineTest extends AbstractCombineTest {
         PAssert.that(mean).containsInAnyOrder(globalMean);
         PAssert.that(meanPerKey).containsInAnyOrder(perKeyMeans);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

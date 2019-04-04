@@ -183,8 +183,10 @@ public class ParDoP<InputT, OutputT> implements Processor {
 
     @SuppressWarnings("unchecked")
     private void processNonBufferedRegularItems(Inbox inbox) {
+        //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId); //useful for debugging
         doFnRunner.startBundle();
         for (WindowedValue<InputT> windowedValue; (windowedValue = (WindowedValue<InputT>) inbox.poll()) != null; ) {
+            //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
             doFnRunner.processElement(windowedValue);
             if (!outputManager.tryFlush()) {
                 break;

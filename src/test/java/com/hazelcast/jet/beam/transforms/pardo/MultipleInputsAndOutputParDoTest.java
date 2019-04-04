@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.pardo;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.VarIntCoder;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.Create;
@@ -39,6 +40,8 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+
+import static junit.framework.TestCase.assertEquals;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.ParDoTest.MultipleInputsAndOutputTests */
 public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
@@ -82,7 +85,8 @@ public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
                 .satisfies(HasExpectedOutput.forInput(inputs).fromOutput(additionalOutputTag3));
         PAssert.that(outputs.get(additionalOutputTagUnwritten)).empty();
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -123,7 +127,8 @@ public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
                 .satisfies(HasExpectedOutput.forInput(inputs).fromOutput(additionalOutputTag3));
         PAssert.that(outputs.get(additionalOutputTagUnwritten)).empty();
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -146,7 +151,8 @@ public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
         PAssert.that(outputs.get(additionalOutputTag1)).empty();
         PAssert.that(outputs.get(additionalOutputTag2)).empty();
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -173,7 +179,8 @@ public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
         PAssert.that(outputs.get(mainOutputTag)).empty();
         PAssert.that(outputs.get(additionalOutputTag)).containsInAnyOrder(inputs);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -203,7 +210,8 @@ public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
         PAssert.that(output)
                 .satisfies(HasExpectedOutput.forInput(inputs).andSideInputs(11, 222));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -235,7 +243,8 @@ public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
         PAssert.that(output)
                 .satisfies(HasExpectedOutput.forInput(inputs).andSideInputs(11, 222));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -271,7 +280,8 @@ public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
         PAssert.that(outputs.get(mainOutputTag))
                 .satisfies(HasExpectedOutput.forInput(inputs).andSideInputs(11, 222));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -307,7 +317,8 @@ public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
         PAssert.that(outputs.get(mainOutputTag))
                 .satisfies(HasExpectedOutput.forInput(inputs).andSideInputs(11, 222));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -335,7 +346,8 @@ public class MultipleInputsAndOutputParDoTest extends AbstractParDoTest {
             PAssert.that(res).inWindow(window).containsInAnyOrder("a:1");
         }
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

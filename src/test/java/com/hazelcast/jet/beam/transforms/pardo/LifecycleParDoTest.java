@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.pardo;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.state.StateSpec;
 import org.apache.beam.sdk.state.StateSpecs;
 import org.apache.beam.sdk.state.ValueState;
@@ -41,6 +42,7 @@ import org.junit.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
@@ -82,7 +84,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
 
         PAssert.that(output).satisfies(new Checker());
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -92,7 +95,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
                 .apply(Flatten.pCollections())
                 .apply(ParDo.of(new CallSequenceEnforcingFn<>()));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -104,7 +108,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
                         ParDo.of(new CallSequenceEnforcingFn<Integer>())
                                 .withOutputTags(new TupleTag<Integer>() {}, TupleTagList.empty()));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -112,7 +117,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         ExceptionThrowingOldFn fn = new ExceptionThrowingOldFn(MethodForException.START_BUNDLE);
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
-            pipeline.run();
+            PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -127,7 +133,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         ExceptionThrowingOldFn fn = new ExceptionThrowingOldFn(MethodForException.PROCESS_ELEMENT);
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
-            pipeline.run();
+            PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -142,7 +149,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         ExceptionThrowingOldFn fn = new ExceptionThrowingOldFn(MethodForException.FINISH_BUNDLE);
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
-            pipeline.run();
+            PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -157,7 +165,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         ExceptionThrowingOldFn fn = new ExceptionThrowingOldFn(MethodForException.SETUP);
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
-            pipeline.run();
+            PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -172,7 +181,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         ExceptionThrowingOldFn fn = new ExceptionThrowingOldFn(MethodForException.START_BUNDLE);
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
-            pipeline.run();
+            PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -187,7 +197,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         ExceptionThrowingOldFn fn = new ExceptionThrowingOldFn(MethodForException.PROCESS_ELEMENT);
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
-            pipeline.run();
+            PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -202,7 +213,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         ExceptionThrowingOldFn fn = new ExceptionThrowingOldFn(MethodForException.FINISH_BUNDLE);
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
-            pipeline.run();
+            PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -224,7 +236,8 @@ public class LifecycleParDoTest extends AbstractParDoTest {
                         ParDo.of(new CallSequenceEnforcingStatefulFn<String, Integer>())
                                 .withOutputTags(new TupleTag<KV<String, Integer>>() {}, TupleTagList.empty()));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static class Checker implements SerializableFunction<Iterable<String>, Void> {

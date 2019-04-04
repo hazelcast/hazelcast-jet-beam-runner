@@ -17,6 +17,7 @@
 package com.hazelcast.jet.beam.transforms;
 
 import org.apache.beam.sdk.Pipeline;
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.BigEndianLongCoder;
 import org.apache.beam.sdk.coders.CannotProvideCoderException;
 import org.apache.beam.sdk.coders.Coder;
@@ -53,6 +54,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.apache.beam.sdk.TestUtils.LINES;
 import static org.apache.beam.sdk.TestUtils.LINES2;
 import static org.apache.beam.sdk.TestUtils.LINES_ARRAY;
@@ -74,7 +76,8 @@ public class FlattenTest extends AbstractTransformTest {
                 makePCollectionListOfStrings(pipeline, inputs).apply(Flatten.pCollections());
 
         PAssert.that(output).containsInAnyOrder(flattenLists(inputs));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -85,7 +88,8 @@ public class FlattenTest extends AbstractTransformTest {
         assertThat(output, not(equalTo(input)));
 
         PAssert.that(output).containsInAnyOrder(LINES);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -98,7 +102,8 @@ public class FlattenTest extends AbstractTransformTest {
                         .apply(ParDo.of(new IdentityFn<>()));
 
         PAssert.that(output).containsInAnyOrder(flattenLists(inputs));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -109,7 +114,8 @@ public class FlattenTest extends AbstractTransformTest {
                         .setCoder(StringUtf8Coder.of());
 
         PAssert.that(output).empty();
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -141,7 +147,8 @@ public class FlattenTest extends AbstractTransformTest {
         }
         PAssert.that(flattened).containsInAnyOrder(expectedLongs);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -162,7 +169,8 @@ public class FlattenTest extends AbstractTransformTest {
         PAssert.that(flattened)
                 .containsInAnyOrder(
                         0L, 0L, 1L, 1L, 2L, 3L, 2L, 4L, 5L, 3L, 6L, 7L, 4L, 8L, 9L, null, null, null);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -188,7 +196,8 @@ public class FlattenTest extends AbstractTransformTest {
                                         .withSideInputs(view));
 
         PAssert.that(output).empty();
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -200,7 +209,8 @@ public class FlattenTest extends AbstractTransformTest {
                         .apply(ParDo.of(new IdentityFn<>()));
 
         PAssert.that(output).empty();
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -213,7 +223,8 @@ public class FlattenTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(LINES_ARRAY);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -225,7 +236,8 @@ public class FlattenTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(LINES_ARRAY);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -239,7 +251,8 @@ public class FlattenTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(LINES_ARRAY);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -255,7 +268,8 @@ public class FlattenTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(LINES_ARRAY);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -269,7 +283,8 @@ public class FlattenTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(NO_LINES_ARRAY);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -304,7 +319,8 @@ public class FlattenTest extends AbstractTransformTest {
         PAssert.that(outputEvenLength).containsInAnyOrder("AA", "CC");
         PAssert.that(outputOddLength).containsInAnyOrder("BBB");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private PCollectionList<String> makePCollectionListOfStrings(

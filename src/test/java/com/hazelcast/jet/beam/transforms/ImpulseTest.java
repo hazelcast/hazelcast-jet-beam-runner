@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.FlatMapElements;
 import org.apache.beam.sdk.transforms.Impulse;
@@ -26,11 +27,13 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
+import static junit.framework.TestCase.assertEquals;
+
 /* "Inspired" by org.apache.beam.sdk.transforms.ImpulseTest */
 public class ImpulseTest extends AbstractTransformTest {
 
     @Test
-    @Ignore //todo: impulse data sources not yet implemented
+    @Ignore //todo: this test fail when there is parallelism, because the data is emitted multiple times...
     public void testImpulse() {
         PCollection<Integer> result =
                 pipeline.apply(Impulse.create())
@@ -38,7 +41,9 @@ public class ImpulseTest extends AbstractTransformTest {
                                 FlatMapElements.into(TypeDescriptors.integers())
                                         .via(impulse -> Arrays.asList(1, 2, 3)));
         PAssert.that(result).containsInAnyOrder(1, 2, 3);
-        pipeline.run().waitUntilFinish();
+
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.AtomicCoder;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.coders.CoderException;
@@ -87,7 +88,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(47, 47, 47);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -126,7 +128,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(47, 47, 48);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -157,7 +160,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(11, 13, 17, 23, 11, 13, 17, 23);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -206,7 +210,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(11, 13, 17, 23, 31, 33, 37, 43);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -235,7 +240,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(results).containsInAnyOrder(1);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -284,7 +290,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(output).containsInAnyOrder(11);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -313,7 +320,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(11, 13, 17, 23, 11, 13, 17, 23);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -359,7 +367,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(11, 13, 17, 23, 31, 33, 37, 43);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -387,7 +396,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(results).containsInAnyOrder(1);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -422,7 +432,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(output).containsInAnyOrder(11);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -460,7 +471,8 @@ public class ViewTest extends AbstractTransformTest {
                         KV.of("banana", 3),
                         KV.of("blackberry", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -498,7 +510,8 @@ public class ViewTest extends AbstractTransformTest {
         PAssert.that(output)
                 .containsInAnyOrder(KV.of("a", 1), KV.of("a", 1), KV.of("a", 2), KV.of("b", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -537,7 +550,8 @@ public class ViewTest extends AbstractTransformTest {
                         KV.of("banana", 3),
                         KV.of("blackberry", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -586,7 +600,8 @@ public class ViewTest extends AbstractTransformTest {
                         KV.of("banana", 3),
                         KV.of("blackberry", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -634,7 +649,8 @@ public class ViewTest extends AbstractTransformTest {
         PAssert.that(output)
                 .containsInAnyOrder(KV.of("a", 1), KV.of("a", 1), KV.of("a", 2), KV.of("b", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -684,7 +700,8 @@ public class ViewTest extends AbstractTransformTest {
                         KV.of("banana", 3),
                         KV.of("blackberry", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -717,7 +734,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(results).containsInAnyOrder(1);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -751,7 +769,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(results).containsInAnyOrder(1);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -800,7 +819,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(output).containsInAnyOrder(KV.of("apple", 1));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -832,7 +852,8 @@ public class ViewTest extends AbstractTransformTest {
         PAssert.that(output)
                 .containsInAnyOrder(KV.of("apple", 1), KV.of("banana", 3), KV.of("blackberry", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -864,7 +885,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(KV.of("a", 1), KV.of("b", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -899,7 +921,8 @@ public class ViewTest extends AbstractTransformTest {
         PAssert.that(output)
                 .containsInAnyOrder(KV.of("apple", 1), KV.of("banana", 3), KV.of("blackberry", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -943,7 +966,8 @@ public class ViewTest extends AbstractTransformTest {
         PAssert.that(output)
                 .containsInAnyOrder(KV.of("apple", 1), KV.of("banana", 2), KV.of("blackberry", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -986,7 +1010,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(KV.of("a", 1), KV.of("b", 2), KV.of("b", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1031,7 +1056,8 @@ public class ViewTest extends AbstractTransformTest {
         PAssert.that(output)
                 .containsInAnyOrder(KV.of("apple", 1), KV.of("banana", 2), KV.of("blackberry", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1064,7 +1090,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(results).containsInAnyOrder(1);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1098,7 +1125,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(results).containsInAnyOrder(1);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1148,7 +1176,8 @@ public class ViewTest extends AbstractTransformTest {
         // Pass at least one value through to guarantee that DoFn executes.
         PAssert.that(output).containsInAnyOrder(KV.of("apple", 1));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1181,7 +1210,8 @@ public class ViewTest extends AbstractTransformTest {
         PAssert.that(output)
                 .containsInAnyOrder(KV.of("apple", 21), KV.of("banana", 3), KV.of("blackberry", 3));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1222,7 +1252,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder("A1", "B5", "C1");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1263,7 +1294,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder("A6", "B6", "C6");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1301,7 +1333,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder("A0", "B5", "C0");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1330,7 +1363,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder("null");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -1385,7 +1419,8 @@ public class ViewTest extends AbstractTransformTest {
 
         PAssert.that(output).containsInAnyOrder(17);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static class NonDeterministicStringCoder extends AtomicCoder<String> {

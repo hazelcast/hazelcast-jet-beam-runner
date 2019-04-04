@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms.groupby;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.CoderProviders;
 import org.apache.beam.sdk.coders.KvCoder;
@@ -53,6 +54,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.collection.IsIterableContainingInAnyOrder.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
@@ -89,7 +91,8 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
         PAssert.that(output).satisfies(checker);
         PAssert.that(output).inWindow(GlobalWindow.INSTANCE).satisfies(checker);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -105,7 +108,8 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
 
         PAssert.that(output).empty();
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -134,7 +138,8 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
 
         PAssert.that(triggeredSums).containsInAnyOrder(7);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -149,7 +154,8 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
                 .apply(GroupByKey.create())
                 .apply(ParDo.of(new AssertTimestamp(new Instant(0))));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     /**
@@ -168,7 +174,8 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
                 .apply(GroupByKey.create())
                 .apply(ParDo.of(new AssertTimestamp(new Instant(10))));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -207,7 +214,8 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
 
         PAssert.that(result.apply(Keys.create())).satisfies(new AssertThatAllKeysExist(numKeys));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -272,7 +280,8 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
                             return null;
                         });
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static String bigString(char c, int size) {

@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.Count;
@@ -30,6 +31,8 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
+import static junit.framework.TestCase.assertEquals;
+
 /* "Inspired" by org.apache.beam.examples.WordCountTest */
 public class WordCountTest extends AbstractTransformTest {
 
@@ -43,7 +46,9 @@ public class WordCountTest extends AbstractTransformTest {
                 .apply(MapElements.via(new FormatKVAsTextFn()));
 
         PAssert.that(output).containsInAnyOrder("hi: 5", "there: 1", "sue: 2", "bob: 2");
-        pipeline.run().waitUntilFinish();
+
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     static class ExtractWordsFn extends DoFn<String, String> {

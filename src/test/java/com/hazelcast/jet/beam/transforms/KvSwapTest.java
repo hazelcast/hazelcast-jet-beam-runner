@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.NullableCoder;
@@ -28,6 +29,8 @@ import org.apache.beam.sdk.values.PCollection;
 import org.junit.Test;
 
 import java.util.Arrays;
+
+import static junit.framework.TestCase.assertEquals;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.KvSwapTest */
 @SuppressWarnings("ALL")
@@ -64,7 +67,8 @@ public class KvSwapTest extends AbstractTransformTest {
                         KV.of(4, "dup"),
                         KV.of(5, "dup"),
                         KV.of(null, "null"));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

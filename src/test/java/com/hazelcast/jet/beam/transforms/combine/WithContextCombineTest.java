@@ -1,5 +1,6 @@
 package com.hazelcast.jet.beam.transforms.combine;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.Combine;
 import org.apache.beam.sdk.transforms.CombineTest;
@@ -13,6 +14,8 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+
+import static junit.framework.TestCase.assertEquals;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.CombineTest.CombineWithContextTests */
 public class WithContextCombineTest extends AbstractCombineTest {
@@ -59,7 +62,8 @@ public class WithContextCombineTest extends AbstractCombineTest {
         PAssert.that(combinePerKey).containsInAnyOrder(perKeyCombines);
         PAssert.that(combineGlobally).containsInAnyOrder(globallyCombines);
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }

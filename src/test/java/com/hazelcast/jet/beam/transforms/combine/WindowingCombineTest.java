@@ -1,5 +1,6 @@
 package com.hazelcast.jet.beam.transforms.combine;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
@@ -36,6 +37,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.hamcrest.Matchers.hasItem;
 import static org.junit.Assert.assertThat;
 
@@ -66,7 +68,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
         PAssert.that(sumPerKey)
                 .containsInAnyOrder(
                         Arrays.asList(KV.of("a", "11"), KV.of("a", "4"), KV.of("b", "1"), KV.of("b", "13")));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -107,7 +110,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
                         Arrays.asList(
                                 KV.of("a", "2:11"), KV.of("a", "5:4"), KV.of("b", "5:1"), KV.of("b", "13:13")));
         PAssert.that(combineGloballyWithContext).containsInAnyOrder("2:11", "5:14", "13:13");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -165,7 +169,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
                         ImmutableList.of("b", "c"),
                         ImmutableList.of("c"));
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -215,7 +220,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
                                 KV.of("b", "13:13")));
         PAssert.that(combineGloballyWithContext)
                 .containsInAnyOrder("1:1", "2:11", "1:1", "4:4", "5:14", "14:113", "13:13");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -242,7 +248,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
                             return null;
                         });
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -267,7 +274,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
         PAssert.that(sum).containsInAnyOrder(7, 13);
         PAssert.that(sumPerKey)
                 .containsInAnyOrder(Arrays.asList(KV.of("a", "114"), KV.of("b", "1"), KV.of("b", "13")));
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -317,7 +325,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
                 .containsInAnyOrder(
                         Arrays.asList(KV.of("a", "1:114"), KV.of("b", "1:1"), KV.of("b", "0:13")));
         PAssert.that(sessionsCombineGlobally).containsInAnyOrder("1:1114", "0:13");
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -330,7 +339,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
 
         PAssert.that(mean).empty();
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -355,7 +365,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
                                         .withSideInputs(view));
 
         PAssert.thatSingleton(output).isEqualTo(0);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -398,7 +409,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
         PAssert.that(output)
                 .inWindow(windowFn.assignWindow(emptyElement.getTimestamp()))
                 .containsInAnyOrder(0);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     /**
@@ -421,7 +433,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
                                         }));
 
         PAssert.that(output).containsInAnyOrder(10);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     /**
@@ -434,7 +447,8 @@ public class WindowingCombineTest extends AbstractCombineTest {
                 pipeline.apply(Create.of(1, 2, 3, 4)).apply(Combine.globally(new Summer()::sum));
 
         PAssert.that(output).containsInAnyOrder(10);
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     private static class FormatPaneInfo extends DoFn<Integer, String> {

@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.beam.transforms;
 
+import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
@@ -27,6 +28,8 @@ import org.apache.beam.sdk.values.PCollection;
 import org.junit.Test;
 
 import java.util.Arrays;
+
+import static junit.framework.TestCase.assertEquals;
 
 /* "Inspired" by org.apache.beam.sdk.transforms.KeysTest */
 @SuppressWarnings("ALL")
@@ -50,7 +53,8 @@ public class KeysTest extends AbstractTransformTest {
         PCollection<String> output = input.apply(Keys.create());
         PAssert.that(output).containsInAnyOrder("one", "two", "three", "dup", "dup");
 
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
     @Test
@@ -62,7 +66,8 @@ public class KeysTest extends AbstractTransformTest {
 
         PCollection<String> output = input.apply(Keys.create());
         PAssert.that(output).empty();
-        pipeline.run();
+        PipelineResult.State state = pipeline.run().waitUntilFinish();
+        assertEquals(PipelineResult.State.DONE, state);
     }
 
 }
