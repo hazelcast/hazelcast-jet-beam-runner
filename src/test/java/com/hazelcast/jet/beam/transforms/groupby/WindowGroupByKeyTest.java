@@ -22,6 +22,7 @@ import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.PAssert;
+import org.apache.beam.sdk.testing.TestStream;
 import org.apache.beam.sdk.testing.ValidatesRunner;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.GroupByKey;
@@ -89,6 +90,44 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
 
         PipelineResult.State state = pipeline.run().waitUntilFinish();
         assertEquals(PipelineResult.State.DONE, state);
+    }
+
+    @Test
+    public void testGroupByKeyAndWindows_streaming() {
+        PCollection<KV<String, Integer>> input =
+                pipeline.apply(TestStream.create(KvCoder.of(StringUtf8Coder.of(), BigEndianIntegerCoder.of()))
+                                         .addElements(TimestampedValue.of(KV.of("k1", 3), new Instant(1)))
+                                         .addElements(TimestampedValue.of(KV.of("k5", Integer.MAX_VALUE), new Instant(2)))
+                                         .addElements(TimestampedValue.of(KV.of("k5", Integer.MIN_VALUE), new Instant(3)))
+                                         .addElements(TimestampedValue.of(KV.of("k2", 66), new Instant(4)))
+                                         .addElements(TimestampedValue.of(KV.of("k1", 4), new Instant(5)))
+                                         .advanceWatermarkTo(new Instant(5))
+                                         .addElements(TimestampedValue.of(KV.of("k2", -33), new Instant(6)))
+                                         .addElements(TimestampedValue.of(KV.of("k3", 0), new Instant(7)))
+                                         .advanceWatermarkToInfinity());
+        PCollection<KV<String, Iterable<Integer>>> output =
+                input.apply(Window.into(FixedWindows.of(new Duration(5))))
+                     .apply(GroupByKey.create());
+
+        PAssert.that(output)
+               .satisfies(
+                       containsKvs(
+                               kv("k1", 3),
+                               kv("k1", 4),
+                               kv("k5", Integer.MAX_VALUE, Integer.MIN_VALUE),
+                               kv("k2", 66),
+                               kv("k2", -33),
+                               kv("k3", 0)));
+        PAssert.that(output)
+               .inWindow(new IntervalWindow(new Instant(0L), Duration.millis(5L)))
+               .satisfies(
+                       containsKvs(
+                               kv("k1", 3), kv("k5", Integer.MIN_VALUE, Integer.MAX_VALUE), kv("k2", 66)));
+        PAssert.that(output)
+               .inWindow(new IntervalWindow(new Instant(5L), Duration.millis(5L)))
+               .satisfies(containsKvs(kv("k1", 4), kv("k2", -33), kv("k3", 0)));
+
+        pipeline.run();
     }
 
     @Test

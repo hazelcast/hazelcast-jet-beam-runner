@@ -92,7 +92,7 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
             Traverser<Map.Entry<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>>> windowTraverser = () -> {
                 while (iterator.hasNext()) {
                     Entry<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>> next = iterator.next();
-                    if (next.getKey().maxTimestamp().getMillis() < timestamp - 1) {
+                    if (next.getKey().maxTimestamp().getMillis() < timestamp) {
                         iterator.remove();
                         return next;
                     }

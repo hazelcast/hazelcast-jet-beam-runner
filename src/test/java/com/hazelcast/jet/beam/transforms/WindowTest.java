@@ -579,6 +579,7 @@ public class WindowTest extends AbstractTransformTest {
                 primitiveDisplayData, hasDisplayItem("timestampCombiner", timestampCombiner.toString()));
     }
 
+  // Test commented out, doesn't compile: the Window.Assign constructor is package-private
 //  @Test
 //  public void testAssignDisplayDataUnchanged() {
 //    FixedWindows windowFn = FixedWindows.of(Duration.standardHours(5));
