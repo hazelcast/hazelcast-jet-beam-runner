@@ -18,6 +18,7 @@ package com.hazelcast.jet.beam.portability;
 
 import com.hazelcast.jet.Jet;
 import com.hazelcast.jet.JetInstance;
+import com.hazelcast.jet.config.JetConfig;
 import org.apache.beam.model.pipeline.v1.Endpoints;
 import org.apache.beam.runners.fnexecution.GrpcFnServer;
 import org.apache.beam.runners.fnexecution.ServerFactory;
@@ -88,7 +89,9 @@ public class JetJobServerDriver implements Runnable {
     }
 
     public static void main(String[] args) {
-        JetInstance jet = Jet.newJetInstance(); //todo: hack, setting up the Jet cluster is not this driver's responsibility
+        JetConfig config = new JetConfig();
+        config.getHazelcastConfig().getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false); //todo: remove?
+        JetInstance jet = Jet.newJetInstance(config); //todo: hack, setting up the Jet cluster is not this driver's responsibility
         try {
             // Register standard file systems.
             FileSystems.setDefaultPipelineOptions(PipelineOptionsFactory.create()); //todo: needed?

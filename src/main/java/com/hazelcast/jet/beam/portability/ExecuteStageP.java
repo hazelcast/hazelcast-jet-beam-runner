@@ -75,11 +75,12 @@ public class ExecuteStageP implements Processor {
         this.jobInfo = jobInfo;
         this.outputCollToOrdinals = outputCollToOrdinals;
         this.ownerId = ownerId;
+        //System.out.println(ExecuteStageP.class.getSimpleName() + " CREATE, ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
     public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
-        outputHandler = new OutputHandler(outbox, outputCollToOrdinals);
+        outputHandler = new OutputHandler(ownerId, outbox, outputCollToOrdinals);
 
         executableStage = ExecutableStage.fromPayload(stagePayload);
         stageBundleFactory = JetStageBundleFactories.get(jobInfo, executableStage);
@@ -97,9 +98,6 @@ public class ExecuteStageP implements Processor {
                 outputHandler.tryFlush();
             }
         };
-
-        //System.out.println(ExecuteStageP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
-        //if (ownerId.startsWith("8 ")) System.out.println(ExecuteStageP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
     private StateRequestHandler getStateRequestHandler(
@@ -180,6 +178,7 @@ public class ExecuteStageP implements Processor {
         FnDataReceiver<WindowedValue<?>> mainReceiver = bundle.getInputReceivers().get(inputPCollectionId);
         if (mainReceiver == null) throw new RuntimeException("Main input receiver for [" + inputPCollectionId + "] could not be initialized");
         for (WindowedValue input : iterable) {
+            //System.out.println(ExecuteStageP.class.getSimpleName() + " INPUT ownerId = " + ownerId + ", input = " + input); //useful for debuggingZ
             mainReceiver.accept(input);
         }
     }
@@ -238,6 +237,7 @@ public class ExecuteStageP implements Processor {
 
     private static class OutputHandler implements OutputReceiverFactory {
 
+        private final String ownerId;
         private final Outbox outbox;
         private final List<Object>[] outputBuckets;
         private final Map<String, PCollectionReceiver> outputReceivers;
@@ -245,7 +245,8 @@ public class ExecuteStageP implements Processor {
         // the flush position to continue flushing to outbox
         private int currentBucket, currentItem;
 
-        OutputHandler(Outbox outbox, Map<String, int[]> outputCollToOrdinals) {
+        OutputHandler(String ownerId, Outbox outbox, Map<String, int[]> outputCollToOrdinals) {
+            this.ownerId = ownerId;
             this.outbox = outbox;
             this.outputBuckets = initOutputBuckets(outputCollToOrdinals);
             this.outputReceivers = initOutputReceivers(outputCollToOrdinals, outputBuckets);
@@ -279,6 +280,16 @@ public class ExecuteStageP implements Processor {
             }
         }
 
+        private Map<String, PCollectionReceiver> initOutputReceivers(Map<String, int[]> outputCollToOrdinals, List<Object>[] outputBuckets) {
+            return outputCollToOrdinals.entrySet().stream()
+                    .collect(
+                            Collectors.toMap(
+                                    Map.Entry::getKey,
+                                    e -> new PCollectionReceiver(ownerId, e.getValue(), outputBuckets)
+                            )
+                    );
+        }
+
         private static List<Object>[] initOutputBuckets(Map<String, int[]> outputCollToOrdinals) {
             int maxOrdinal = outputCollToOrdinals.values().stream().flatMapToInt(IntStream::of).max().orElse(-1);
             List<Object>[] outputBuckets = new List[maxOrdinal + 1];
@@ -286,30 +297,23 @@ public class ExecuteStageP implements Processor {
             return outputBuckets;
         }
 
-        private static Map<String, PCollectionReceiver> initOutputReceivers(Map<String, int[]> outputCollToOrdinals, List<Object>[] outputBuckets) {
-            return outputCollToOrdinals.entrySet().stream()
-                    .collect(
-                            Collectors.toMap(
-                                    Map.Entry::getKey,
-                                    e -> new PCollectionReceiver(e.getValue(), outputBuckets)
-                            )
-                    );
-        }
-
     }
 
     private static class PCollectionReceiver implements FnDataReceiver {
 
+        private final String ownerId;
         private final int[] ordinals;
         private final List<Object>[] outputBuckets;
 
-        PCollectionReceiver(int[] ordinals, List<Object>[] outputBuckets) {
+        PCollectionReceiver(String ownerId, int[] ordinals, List<Object>[] outputBuckets) {
+            this.ownerId = ownerId;
             this.ordinals = ordinals;
             this.outputBuckets = outputBuckets;
         }
 
         @Override
         public void accept(Object output) {
+            //System.out.println(ExecuteStageP.class.getSimpleName() + " OUTPUT ownerId = " + ownerId + ", output = " + o); //useful for debugging
             synchronized (outputBuckets) { //todo: we will need to do something smarter here, at least synchronize per individual bucket
                 for (int ordinal : ordinals) {
                     outputBuckets[ordinal].add(output);
