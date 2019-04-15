@@ -77,39 +77,6 @@ public class TimerCoderInferenceParDoTest extends AbstractParDoTest {
 
     @Test
     @Ignore
-    public void testValueStateCoderInferenceFailure() {
-        final String stateId = "foo";
-        MyIntegerCoder myIntegerCoder = MyIntegerCoder.of();
-
-        DoFn<KV<String, Integer>, MyInteger> fn =
-                new DoFn<KV<String, Integer>, MyInteger>() {
-
-                    @StateId(stateId)
-                    private final StateSpec<ValueState<MyInteger>> intState = StateSpecs.value();
-
-                    @ProcessElement
-                    public void processElement(
-                            @StateId(stateId) ValueState<MyInteger> state, OutputReceiver<MyInteger> r) {
-                        MyInteger currentValue = MoreObjects.firstNonNull(state.read(), new MyInteger(0));
-                        r.output(currentValue);
-                        state.write(new MyInteger(currentValue.getValue() + 1));
-                    }
-                };
-
-        thrown.expect(RuntimeException.class);
-        thrown.expectMessage("Unable to infer a coder for ValueState and no Coder was specified.");
-
-        pipeline
-                .apply(Create.of(KV.of("hello", 42), KV.of("hello", 97), KV.of("hello", 84)))
-                .apply(ParDo.of(fn))
-                .setCoder(myIntegerCoder);
-
-        PipelineResult.State state = pipeline.run().waitUntilFinish();
-        assertEquals(PipelineResult.State.DONE, state);
-    }
-
-    @Test
-    @Ignore
     public void testValueStateCoderInferenceFromInputCoder() {
         final String stateId = "foo";
         MyIntegerCoder myIntegerCoder = MyIntegerCoder.of();

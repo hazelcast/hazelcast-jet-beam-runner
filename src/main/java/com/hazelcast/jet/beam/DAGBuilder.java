@@ -124,7 +124,7 @@ public class DAGBuilder {
                 if (sourceVertex == null) throw new RuntimeException("Oops!");
 
                 List<Vertex> destinationVertices = edgeEndPoints.getOrDefault(edgeId, Collections.emptyList());
-                boolean sideInputEdge = edgeId.toString().contains("PCollectionView"); //todo: this is a hack!
+                boolean sideInputEdge = edgeId.contains("PCollectionView"); //todo: this is a hack!
                 for (Vertex destinationVertex : destinationVertices) {
                     addEdge(sourceVertex, destinationVertex, edgeId, pCollId, sideInputEdge);
                 }
@@ -138,7 +138,7 @@ public class DAGBuilder {
                 Edge edge = Edge
                         .from(sourceVertex, getNextFreeOrdinal(sourceVertex, false))
                         .to(destinationVertex, getNextFreeOrdinal(destinationVertex, true))
-                        .distributed();
+                        .distributed(); //todo: why is it always distributed?
                 if (sideInputEdge) {
                     edge = edge.broadcast();
                 } else {

@@ -25,10 +25,7 @@ import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.coders.VarIntCoder;
 import org.apache.beam.sdk.io.GenerateSequence;
 import org.apache.beam.sdk.runners.TransformHierarchy;
-import org.apache.beam.sdk.testing.DataflowPortabilityApiUnsupported;
 import org.apache.beam.sdk.testing.PAssert;
-import org.apache.beam.sdk.testing.UsesCustomWindowMerging;
-import org.apache.beam.sdk.testing.ValidatesRunner;
 import org.apache.beam.sdk.transforms.Combine;
 import org.apache.beam.sdk.transforms.Count;
 import org.apache.beam.sdk.transforms.Create;
@@ -65,7 +62,6 @@ import org.hamcrest.Matchers;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mockito;
@@ -407,7 +403,6 @@ public class WindowTest extends AbstractTransformTest {
     }
 
     @Test
-    @Category({ValidatesRunner.class, DataflowPortabilityApiUnsupported.class})
     public void testNoWindowFnDoesNotReassignWindows() {
         pipeline.enableAbandonedNodeEnforcement(true);
 
@@ -460,7 +455,6 @@ public class WindowTest extends AbstractTransformTest {
      * the windowing function default, the end of the window.
      */
     @Test
-    @Category(ValidatesRunner.class)
     public void testTimestampCombinerDefault() {
         pipeline
                 .apply(
@@ -493,7 +487,6 @@ public class WindowTest extends AbstractTransformTest {
      * the windowing function customized to use the end of the window.
      */
     @Test
-    @Category(ValidatesRunner.class)
     public void testTimestampCombinerEndOfWindow() {
         pipeline
                 .apply(
@@ -547,7 +540,6 @@ public class WindowTest extends AbstractTransformTest {
     }
 
     @Test
-    @Category(ValidatesRunner.class)
     public void testPrimitiveDisplayData() {
         FixedWindows windowFn = FixedWindows.of(Duration.standardHours(5));
         AfterWatermark.FromEndOfWindow triggerBuilder = AfterWatermark.pastEndOfWindow();
@@ -632,7 +624,6 @@ public class WindowTest extends AbstractTransformTest {
     }
 
     @Test
-    @Category({ValidatesRunner.class, UsesCustomWindowMerging.class})
     public void testMergingCustomWindows() {
         Instant startInstant = new Instant(0L);
         PCollection<String> inputCollection =
@@ -656,7 +647,6 @@ public class WindowTest extends AbstractTransformTest {
     //  This test is usefull because some runners have a special merge implementation
     // for keyed collections
     @Test
-    @Category({ValidatesRunner.class, UsesCustomWindowMerging.class})
     public void testMergingCustomWindowsKeyedCollection() {
         Instant startInstant = new Instant(0L);
         PCollection<KV<Integer, String>> inputCollection =

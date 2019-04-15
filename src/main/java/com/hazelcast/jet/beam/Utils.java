@@ -16,21 +16,26 @@
 
 package com.hazelcast.jet.beam;
 
+import org.apache.beam.runners.core.construction.ParDoTranslation;
 import org.apache.beam.runners.core.construction.TransformInputs;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy;
+import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
+import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.PValue;
 import org.apache.beam.sdk.values.TupleTag;
+import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Iterables;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Collection;
@@ -41,6 +46,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static java.util.stream.Collectors.toList;
+import static org.apache.beam.vendor.guava.v20_0.com.google.common.base.Preconditions.checkState;
 
 public class Utils {
 
@@ -106,6 +112,44 @@ public class Utils {
             return singleParDo.getSideInputs();
         }
         return Collections.emptyList();
+    }
+
+    static boolean usesStateOrTimers(AppliedPTransform<?, ?, ?> appliedTransform) {
+        try {
+            return ParDoTranslation.usesStateOrTimers(appliedTransform);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static DoFn<?, ?> getDoFn(AppliedPTransform<?, ?, ?> appliedTransform) {
+        try {
+            DoFn<?, ?> doFn = ParDoTranslation.getDoFn(appliedTransform);
+            if (DoFnSignatures.signatureForDoFn(doFn).processElement().isSplittable()) {
+                throw new IllegalStateException("Not expected to directly translate splittable DoFn, should have been overridden: " + doFn); //todo
+            }
+            return doFn;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static WindowingStrategy<?, ?> getWindowingStrategy(AppliedPTransform<?, ?, ?> appliedTransform) {
+        // assume that the windowing strategy is the same for all outputs
+
+        Map<TupleTag<?>, PValue> outputs = getOutputs(appliedTransform);
+
+        if (outputs == null || outputs.isEmpty()) throw new IllegalStateException("No outputs defined.");
+
+        TupleTag<?> tag = outputs.keySet().iterator().next();
+        PValue taggedValue = outputs.get(tag);
+        checkState(
+                taggedValue instanceof PCollection,
+                "Within ParDo, got a non-PCollection output %s of type %s",
+                taggedValue,
+                taggedValue.getClass().getSimpleName());
+        PCollection<?> coll = (PCollection<?>) taggedValue;
+        return coll.getWindowingStrategy();
     }
 
     /**

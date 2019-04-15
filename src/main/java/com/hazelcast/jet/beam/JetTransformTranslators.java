@@ -21,13 +21,16 @@ import com.hazelcast.jet.beam.processors.BoundedSourceP;
 import com.hazelcast.jet.beam.processors.FlattenP;
 import com.hazelcast.jet.beam.processors.ImpulseP;
 import com.hazelcast.jet.beam.processors.ParDoP;
+import com.hazelcast.jet.beam.processors.StatefulParDoP;
 import com.hazelcast.jet.beam.processors.TestStreamP;
 import com.hazelcast.jet.beam.processors.TestStreamP.SerializableTimestampedValue;
 import com.hazelcast.jet.beam.processors.TestStreamP.SerializableWatermarkEvent;
 import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
+import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.Vertex;
+import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.runners.core.construction.CreatePCollectionViewTranslation;
 import org.apache.beam.runners.core.construction.PTransformTranslation;
 import org.apache.beam.runners.core.construction.ParDoTranslation;
@@ -43,7 +46,6 @@ import org.apache.beam.sdk.testing.TestStream.ElementEvent;
 import org.apache.beam.sdk.testing.TestStream.WatermarkEvent;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
-import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.DefaultTrigger;
 import org.apache.beam.sdk.transforms.windowing.Never;
@@ -58,7 +60,6 @@ import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.PValue;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
-import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -69,7 +70,6 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
-import static org.apache.beam.vendor.guava.v20_0.com.google.common.base.Preconditions.checkState;
 
 @SuppressWarnings("unchecked")
 class JetTransformTranslators {
@@ -130,37 +130,21 @@ class JetTransformTranslators {
         }
     }
 
-    private static class ParDoTranslator<InputT, OutputT> implements JetTransformTranslator<PTransform<PCollection<InputT>, PCollectionTuple>> {
+    private static class ParDoTranslator implements JetTransformTranslator<PTransform<PCollection, PCollectionTuple>> {
 
         @Override
         public Vertex translate(Pipeline pipeline, Node node, JetTranslationContext context) {
-            AppliedPTransform<PCollection<InputT>, PCollection<OutputT>, PTransform<PCollection<InputT>, PCollection<OutputT>>> appliedTransform =
-                    (AppliedPTransform<PCollection<InputT>, PCollection<OutputT>, PTransform<PCollection<InputT>, PCollection<OutputT>>>) node.toAppliedPTransform(pipeline);
+            AppliedPTransform<PCollection, PCollection, PTransform<PCollection, PCollection>> appliedTransform =
+                    (AppliedPTransform<PCollection, PCollection, PTransform<PCollection, PCollection>>) node.toAppliedPTransform(pipeline);
 
-            boolean usesStateOrTimers;
-            try {
-                usesStateOrTimers = ParDoTranslation.usesStateOrTimers(appliedTransform);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-
-            if (usesStateOrTimers) throw new UnsupportedOperationException("State and/or timers not supported at the moment!");
-
-            DoFn<InputT, OutputT> doFn;
-            try {
-                doFn = (DoFn<InputT, OutputT>) ParDoTranslation.getDoFn(appliedTransform);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            if (DoFnSignatures.signatureForDoFn(doFn).processElement().isSplittable()) {
-                throw new IllegalStateException("Not expected to directly translate splittable DoFn, should have been overridden: " + doFn); //todo
-            }
+            boolean usesStateOrTimers = Utils.usesStateOrTimers(appliedTransform);
+            DoFn<?, ?> doFn = Utils.getDoFn(appliedTransform);
 
             Map<TupleTag<?>, PValue> outputs = Utils.getOutputs(appliedTransform);
 
-            TupleTag<OutputT> mainOutputTag;
+            TupleTag<?> mainOutputTag;
             try {
-                mainOutputTag = (TupleTag<OutputT>) ParDoTranslation.getMainOutputTag(appliedTransform);
+                mainOutputTag = ParDoTranslation.getMainOutputTag(appliedTransform);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -171,27 +155,7 @@ class JetTransformTranslators {
                     outputMap.put(tag, count++);
                 }
             }
-
-            // assume that the windowing strategy is the same for all outputs
-            final WindowingStrategy<?, ?>[] windowingStrategy = new WindowingStrategy[1]; //todo: the array is an ugly hack
-
-            // collect all output Coders and create a UnionCoder for our tagged outputs
-            List<Coder<?>> outputCoders = Lists.newArrayList();
-            for (TupleTag<?> tag : outputs.keySet()) {
-                PValue taggedValue = outputs.get(tag);
-                checkState(
-                        taggedValue instanceof PCollection,
-                        "Within ParDo, got a non-PCollection output %s of type %s",
-                        taggedValue,
-                        taggedValue.getClass().getSimpleName());
-                PCollection<?> coll = (PCollection<?>) taggedValue;
-                outputCoders.add(coll.getCoder());
-                windowingStrategy[0] = coll.getWindowingStrategy();
-            }
-
-            if (windowingStrategy[0] == null) {
-                throw new IllegalStateException("No outputs defined.");
-            }
+            final WindowingStrategy<?, ?> windowingStrategy = Utils.getWindowingStrategy(appliedTransform);
 
             Map<TupleTag<?>, Coder<?>> outputCoderMap = Utils.getOutputCoders(appliedTransform);
 
@@ -199,20 +163,34 @@ class JetTransformTranslators {
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
             SerializablePipelineOptions pipelineOptions = context.getOptions();
-            Coder<InputT> coder = ((PCollection) Utils.getInput(appliedTransform)).getCoder();
+            Coder coder = ((PCollection) Utils.getInput(appliedTransform)).getCoder();
             List<PCollectionView<?>> sideInputs = Utils.getSideInputs(appliedTransform);
-            ParDoP.Supplier<InputT, OutputT> processorSupplier = new ParDoP.Supplier<>(
-                    vertexId,
-                    doFn,
-                    windowingStrategy[0],
-                    pipelineOptions, mainOutputTag, outputMap.keySet(),
-                    coder,
-                    outputCoderMap,
-                    sideInputs
-            );
+            SupplierEx<Processor> processorSupplier = usesStateOrTimers ?
+                    new StatefulParDoP.Supplier(
+                            vertexId,
+                            doFn,
+                            windowingStrategy,
+                            pipelineOptions,
+                            mainOutputTag,
+                            outputMap.keySet(),
+                            coder,
+                            outputCoderMap,
+                            sideInputs
+                    ) :
+                    new ParDoP.Supplier(
+                            vertexId,
+                            doFn,
+                            windowingStrategy,
+                            pipelineOptions,
+                            mainOutputTag,
+                            outputMap.keySet(),
+                            coder,
+                            outputCoderMap,
+                            sideInputs
+                    );
 
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
-            dagBuilder.registerConstructionListeners(processorSupplier);
+            dagBuilder.registerConstructionListeners((DAGBuilder.WiringListener) processorSupplier);
 
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
             if (mainInputs.size() != 1) throw new RuntimeException("Oops!");
@@ -396,7 +374,7 @@ class JetTransformTranslators {
                             return Stream.of(new SerializableWatermarkEvent(((WatermarkEvent<T>) e).getWatermark().getMillis()));
                         } else if (e instanceof TestStream.ElementEvent) {
                             return StreamSupport.stream(((ElementEvent<T>) e).getElements().spliterator(), false)
-                                                .map(te -> new SerializableTimestampedValue<>(te.getValue(), te.getTimestamp()));
+                                    .map(te -> new SerializableTimestampedValue<>(te.getValue(), te.getTimestamp()));
                         } else {
                             throw new UnsupportedOperationException("Event type not supported in TestStream: " + e.getClass() + ", event: " + e);
                         }

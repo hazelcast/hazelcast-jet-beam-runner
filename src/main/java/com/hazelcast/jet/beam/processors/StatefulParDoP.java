@@ -17,10 +17,10 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.core.Inbox;
-import com.hazelcast.jet.core.Outbox;
 import com.hazelcast.jet.core.Processor;
 import org.apache.beam.runners.core.DoFnRunner;
 import org.apache.beam.runners.core.DoFnRunners;
+import org.apache.beam.runners.core.InMemoryStateInternals;
 import org.apache.beam.runners.core.StateInternals;
 import org.apache.beam.runners.core.StepContext;
 import org.apache.beam.runners.core.TimerInternals;
@@ -28,27 +28,31 @@ import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.util.WindowedValue;
+import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 
-import javax.annotation.Nonnull;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> {
+public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
 
-    private DoFnRunner<InputT, OutputT> doFnRunner;
+    private final Map<Object, DoFnRunner<KV<?, ?>, OutputT>> runners = new HashMap<>();
 
-    private ParDoP(
-            DoFn<InputT, OutputT> doFn,
+    private Object lastKey;
+    private DoFnRunner<KV<?, ?>, OutputT> lastRunner;
+
+    private StatefulParDoP(
+            DoFn<KV<?, ?>, OutputT> doFn,
             WindowingStrategy<?, ?> windowingStrategy,
             Map<TupleTag<?>, int[]> outputCollToOrdinals,
             SerializablePipelineOptions pipelineOptions,
             TupleTag<OutputT> mainOutputTag,
-            Coder<InputT> inputCoder,
+            Coder<KV<?, ?>> inputCoder,
             Map<TupleTag<?>, Coder<?>> outputCoderMap,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
             String ownerId
@@ -67,49 +71,66 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> {
     }
 
     @Override
-    public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
-        super.init(outbox, context);
-        doFnRunner = DoFnRunners.simpleRunner(
-                pipelineOptions.get(),
-                doFn,
-                sideInputReader,
-                outputManager,
-                mainOutputTag,
-                Lists.newArrayList(outputCollToOrdinals.keySet()),
-                new NotImplementedStepContext(),
-                inputCoder,
-                outputCoderMap,
-                windowingStrategy
-        );
-        //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
-        //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
-    }
-
-    @Override
     protected void processNonBufferedRegularItems(Inbox inbox) {
-        //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId); //useful for debugging
-        doFnRunner.startBundle();
-        for (WindowedValue<InputT> windowedValue; (windowedValue = (WindowedValue<InputT>) inbox.poll()) != null; ) {
-            //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
-            doFnRunner.processElement(windowedValue);
+        //System.out.println(StatefulParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId); //useful for debugging
+
+        for (WindowedValue<KV<?, ?>> windowedValue; (windowedValue = (WindowedValue<KV<?, ?>>) inbox.poll()) != null; ) {
+            //System.out.println(StatefulParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
+            KV<?, ?> kv = windowedValue.getValue();
+
+            Object currentKey = kv.getKey();
+            if (lastKey == null) { //first item from the inbox in this round of processing
+                lastKey = currentKey;
+                lastRunner = getRunner(currentKey);
+                lastRunner.startBundle();
+            } else if (!lastKey.equals(currentKey)) { //not first item from inbox in this round of processing, key changes
+                lastRunner.finishBundle();
+                lastKey = currentKey;
+                lastRunner = getRunner(currentKey);
+                lastRunner.startBundle();
+            }
+
+            lastRunner.processElement(windowedValue);
             if (!outputManager.tryFlush()) {
                 break;
             }
         }
-        doFnRunner.finishBundle();
-        // finishBundle can also add items to outputManager, they will be flushed in tryProcess() or complete()
+        if (lastRunner != null) lastRunner.finishBundle();
+
+        lastKey = null;
+        lastRunner = null;
+
+        //todo: this approach to batching might not be the most efficient one... can we extract all items with same key from Inbox?
     }
 
-    public static class Supplier<InputT, OutputT> extends AbstractSupplier<InputT, OutputT> {
+    private DoFnRunner<KV<?, ?>, OutputT> getRunner(Object key) {
+        return runners.computeIfAbsent(
+                key,
+                k -> DoFnRunners.simpleRunner(
+                        pipelineOptions.get(),
+                        doFn,
+                        sideInputReader,
+                        outputManager,
+                        mainOutputTag,
+                        Lists.newArrayList(outputCollToOrdinals.keySet()),
+                        new KeyedStepContext(key),
+                        inputCoder,
+                        outputCoderMap,
+                        windowingStrategy
+                )
+        );
+    }
+
+    public static class Supplier<OutputT> extends AbstractSupplier<KV<?, ?>, OutputT> {
 
         public Supplier(
                 String ownerId,
-                DoFn<InputT, OutputT> doFn,
+                DoFn<KV<?, ?>, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
                 Set<TupleTag<OutputT>> allOutputTags,
-                Coder<InputT> inputCoder,
+                Coder<KV<?, ?>> inputCoder,
                 Map<TupleTag<?>, Coder<?>> outputCoderMap,
                 List<PCollectionView<?>> sideInputs
         ) {
@@ -128,17 +149,17 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> {
 
         @Override
         Processor getEx(
-                DoFn<InputT, OutputT> doFn,
+                DoFn<KV<?, ?>, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
                 Map<TupleTag<?>, int[]> outputCollToOrdinals,
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
-                Coder<InputT> inputCoder,
+                Coder<KV<?, ?>> inputCoder,
                 Map<TupleTag<?>, Coder<?>> outputCoderMap,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
                 String ownerId
         ) {
-            return new ParDoP<>(
+            return new StatefulParDoP<>(
                     doFn,
                     windowingStrategy,
                     outputCollToOrdinals,
@@ -152,13 +173,19 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> {
         }
     }
 
-    private static class NotImplementedStepContext implements StepContext {
+    private static class KeyedStepContext implements StepContext {
 
-        //not needed when not handling state & timers
+        private final Object key;
+        private final StateInternals stateInternals;
+
+        KeyedStepContext(Object key) {
+            this.key = key;
+            stateInternals = InMemoryStateInternals.forKey(key);
+        }
 
         @Override
         public StateInternals stateInternals() {
-            throw new UnsupportedOperationException("stateInternals is not supported");
+            return stateInternals;
         }
 
         @Override

@@ -20,10 +20,8 @@ import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
-import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.testing.TestStream;
-import org.apache.beam.sdk.testing.ValidatesRunner;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.GroupByKey;
 import org.apache.beam.sdk.transforms.windowing.FixedWindows;
@@ -39,7 +37,6 @@ import org.joda.time.Duration;
 import org.joda.time.Instant;
 import org.junit.Assert;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 
 import java.util.Arrays;
 import java.util.List;
@@ -51,7 +48,6 @@ import static junit.framework.TestCase.assertEquals;
 public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
 
     @Test
-    @Category(ValidatesRunner.class)
     public void testGroupByKeyAndWindows() {
         List<KV<String, Integer>> ungroupedPairs =
                 Arrays.asList(
@@ -131,7 +127,6 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
     }
 
     @Test
-    @Category(ValidatesRunner.class)
     public void testGroupByKeyMultipleWindows() {
         PCollection<KV<String, Integer>> windowedInput =
                 pipeline.apply(
@@ -162,7 +157,6 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
     }
 
     @Test
-    @Category(ValidatesRunner.class)
     public void testGroupByKeyMergingWindows() {
         PCollection<KV<String, Integer>> windowedInput =
                 pipeline.apply(
@@ -191,7 +185,6 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
     }
 
     @Test
-    @Category(NeedsRunner.class)
     public void testIdentityWindowFnPropagation() {
 
         List<KV<String, Integer>> ungroupedPairs = Arrays.asList();
@@ -215,7 +208,6 @@ public class WindowGroupByKeyTest extends AbstractGroupByKeyTest {
     }
 
     @Test
-    @Category(NeedsRunner.class)
     public void testWindowFnInvalidation() {
 
         List<KV<String, Integer>> ungroupedPairs = Arrays.asList();

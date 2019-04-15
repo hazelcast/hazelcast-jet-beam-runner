@@ -21,11 +21,9 @@ import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.coders.VarIntCoder;
 import org.apache.beam.sdk.coders.VarLongCoder;
-import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.testing.TestStream;
 import org.apache.beam.sdk.testing.TestStream.Builder;
-import org.apache.beam.sdk.testing.UsesTestStream;
 import org.apache.beam.sdk.transforms.Combine;
 import org.apache.beam.sdk.transforms.Count;
 import org.apache.beam.sdk.transforms.Flatten;
@@ -54,7 +52,6 @@ import org.joda.time.Instant;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
 
 import java.util.stream.StreamSupport;
@@ -71,7 +68,6 @@ public class TestStreamTest extends AbstractTransformTest {
     @Rule public transient ExpectedException thrown = ExpectedException.none();
 
     @Test
-    @Category({NeedsRunner.class, UsesTestStream.class})
     @Ignore // unsupported trigger
     public void testLateDataAccumulating() {
         Instant instant = new Instant(0);
@@ -141,7 +137,6 @@ public class TestStreamTest extends AbstractTransformTest {
     }
 
     @Test
-    @Category({NeedsRunner.class, UsesTestStream.class})
     @Ignore // unsupported trigger, advanceProcessingTime
     public void testProcessingTimeTrigger() {
         TestStream<Long> source =
@@ -174,7 +169,6 @@ public class TestStreamTest extends AbstractTransformTest {
     }
 
     @Test
-    @Category({NeedsRunner.class, UsesTestStream.class})
     @Ignore // unsupported trigger
     public void testDiscardingMode() {
         TestStream<String> stream =
@@ -225,7 +219,6 @@ public class TestStreamTest extends AbstractTransformTest {
     }
 
     @Test
-    @Category({NeedsRunner.class, UsesTestStream.class})
     @Ignore // todo allowed lateness
     public void testFirstElementLate() {
         Instant lateElementTimestamp = new Instant(-1_000_000);
@@ -260,7 +253,6 @@ public class TestStreamTest extends AbstractTransformTest {
     }
 
     @Test
-    @Category({NeedsRunner.class, UsesTestStream.class})
     public void testElementsAtAlmostPositiveInfinity() {
         Instant endOfGlobalWindow = GlobalWindow.INSTANCE.maxTimestamp();
         TestStream<String> stream =
@@ -287,7 +279,6 @@ public class TestStreamTest extends AbstractTransformTest {
     }
 
     @Test
-    @Category({NeedsRunner.class, UsesTestStream.class})
     public void testMultipleStreams() {
         TestStream<String> stream =
                 TestStream.create(StringUtf8Coder.of())
@@ -347,7 +338,6 @@ public class TestStreamTest extends AbstractTransformTest {
     }
 
     @Test
-    @Category({NeedsRunner.class, UsesTestStream.class})
     @Ignore // unsupported triggers
     public void testEarlyPanesOfWindow() {
         TestStream<Long> source =

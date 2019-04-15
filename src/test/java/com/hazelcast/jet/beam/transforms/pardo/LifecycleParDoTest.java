@@ -37,7 +37,6 @@ import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.TupleTagList;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -225,7 +224,6 @@ public class LifecycleParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore //todo: enable after state is implemented
     public void testFnCallSequenceStateful() {
         PCollectionList.of(pipeline.apply("Impolite", Create.of(KV.of("a", 1), KV.of("b", 2), KV.of("a", 4))))
                 .and(

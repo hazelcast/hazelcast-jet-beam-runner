@@ -19,12 +19,8 @@ package com.hazelcast.jet.beam.transforms;
 import org.apache.beam.sdk.coders.IterableCoder;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
-import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.testing.TestStream;
-import org.apache.beam.sdk.testing.UsesStatefulParDo;
-import org.apache.beam.sdk.testing.UsesTestStream;
-import org.apache.beam.sdk.testing.UsesTimersInParDo;
 import org.apache.beam.sdk.transforms.Count;
 import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -42,7 +38,6 @@ import org.joda.time.Duration;
 import org.joda.time.Instant;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.slf4j.Logger;
@@ -85,15 +80,14 @@ public class GroupIntoBatchesTest extends AbstractTransformTest {
   }
 
   @Test
-  @Category({NeedsRunner.class, UsesTimersInParDo.class, UsesStatefulParDo.class})
   @Ignore // state or timers not supported
   public void testInGlobalWindow() {
     PCollection<KV<String, Iterable<String>>> collection =
         pipeline
             .apply("Input data", Create.of(data))
             .apply(GroupIntoBatches.ofSize(BATCH_SIZE))
-            // set output coder
             .setCoder(KvCoder.of(StringUtf8Coder.of(), IterableCoder.of(StringUtf8Coder.of())));
+
     PAssert.that("Incorrect batch size in one ore more elements", collection)
            .satisfies(
             new SerializableFunction<Iterable<KV<String, Iterable<String>>>, Void>() {
@@ -113,18 +107,14 @@ public class GroupIntoBatchesTest extends AbstractTransformTest {
                 return null;
               }
             });
+
     PAssert.thatSingleton("Incorrect collection size", collection.apply("Count", Count.globally()))
         .isEqualTo(NUM_ELEMENTS / BATCH_SIZE);
+
     pipeline.run();
   }
 
   @Test
-  @Category({
-    NeedsRunner.class,
-    UsesTimersInParDo.class,
-    UsesTestStream.class,
-    UsesStatefulParDo.class
-  })
   @Ignore // state or timers not supported
   public void testInStreamingMode() {
     int timestampInterval = 1;

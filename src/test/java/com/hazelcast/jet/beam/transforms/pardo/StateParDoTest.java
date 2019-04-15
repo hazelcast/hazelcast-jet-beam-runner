@@ -59,7 +59,6 @@ import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Sets;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -80,10 +79,7 @@ import static org.junit.Assert.assertFalse;
 @SuppressWarnings("ALL")
 public class StateParDoTest extends AbstractParDoTest {
 
-    //todo: enable tests after state & timers are implemented
-
     @Test
-    @Ignore
     public void testValueStateSimple() {
         final String stateId = "foo";
 
@@ -95,8 +91,7 @@ public class StateParDoTest extends AbstractParDoTest {
                             StateSpecs.value(VarIntCoder.of());
 
                     @ProcessElement
-                    public void processElement(
-                            @StateId(stateId) ValueState<Integer> state, OutputReceiver<Integer> r) {
+                    public void processElement(@StateId(stateId) ValueState<Integer> state, OutputReceiver<Integer> r) {
                         Integer currentValue = MoreObjects.firstNonNull(state.read(), 0);
                         r.output(currentValue);
                         state.write(currentValue + 1);
@@ -114,22 +109,16 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testValueStateDedup() {
         final String stateId = "foo";
 
-        DoFn<KV<Integer, Integer>, Integer> onePerKey =
-                new DoFn<KV<Integer, Integer>, Integer>() {
+        DoFn<KV<Integer, Integer>, Integer> onePerKey = new DoFn<KV<Integer, Integer>, Integer>() {
 
                     @StateId(stateId)
-                    private final StateSpec<ValueState<Integer>> seenSpec =
-                            StateSpecs.value(VarIntCoder.of());
+                    private final StateSpec<ValueState<Integer>> seenSpec = StateSpecs.value(VarIntCoder.of());
 
                     @ProcessElement
-                    public void processElement(
-                            @Element KV<Integer, Integer> element,
-                            @StateId(stateId) ValueState<Integer> seenState,
-                            OutputReceiver<Integer> r) {
+                    public void processElement(@Element KV<Integer, Integer> element, @StateId(stateId) ValueState<Integer> seenState, OutputReceiver<Integer> r) {
                         Integer seen = MoreObjects.firstNonNull(seenState.read(), 0);
 
                         if (seen == 0) {
@@ -165,7 +154,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testCoderInferenceOfList() {
         final String stateId = "foo";
         MyIntegerCoder myIntegerCoder = MyIntegerCoder.of();
@@ -206,7 +194,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testValueStateFixedWindows() {
         final String stateId = "foo";
 
@@ -251,7 +238,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testValueStateSameId() {
         final String stateId = "foo";
 
@@ -303,7 +289,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testValueStateTaggedOutput() {
         final String stateId = "foo";
 
@@ -355,7 +340,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testBagState() {
         final String stateId = "foo";
 
@@ -404,7 +388,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testSetState() {
         final String stateId = "foo";
         final String countStateId = "count";
@@ -458,7 +441,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testMapState() {
         final String stateId = "foo";
         final String countStateId = "count";
@@ -515,7 +497,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testCombiningState() {
         final String stateId = "foo";
 
@@ -554,7 +535,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testCombiningStateParameterSuperclass() {
         final String stateId = "foo";
 
@@ -591,7 +571,6 @@ public class StateParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testBagStateSideInput() {
 
         final PCollectionView<List<Integer>> listView =
