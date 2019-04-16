@@ -17,6 +17,7 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.core.Processor;
+import com.hazelcast.jet.core.Watermark;
 import org.apache.beam.runners.core.DoFnRunner;
 import org.apache.beam.runners.core.DoFnRunners;
 import org.apache.beam.runners.core.InMemoryStateInternals;
@@ -39,6 +40,7 @@ import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
 import org.joda.time.Instant;
 
+import javax.annotation.Nonnull;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -116,19 +118,30 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
     }
 
     @Override
+    public boolean tryProcessWatermark(@Nonnull Watermark watermark) {
+        return flushTimers(watermark.timestamp()) && super.tryProcessWatermark(watermark);
+    }
+
+    @Override
     public boolean complete() {
-        try {
-            timerInternals.advanceInputWatermark(BoundedWindow.TIMESTAMP_MAX_VALUE);
+        return flushTimers(BoundedWindow.TIMESTAMP_MAX_VALUE.getMillis()) && super.complete();
+    }
 
-            timerInternals.advanceProcessingTime(BoundedWindow.TIMESTAMP_MAX_VALUE);
-            timerInternals.advanceSynchronizedProcessingTime(BoundedWindow.TIMESTAMP_MAX_VALUE);
+    private boolean flushTimers(long watermark) {
+        if (watermark == BoundedWindow.TIMESTAMP_MAX_VALUE.getMillis()
+                && timerInternals.currentInputWatermarkTime().isBefore(BoundedWindow.TIMESTAMP_MAX_VALUE)) {
+            try {
+                timerInternals.advanceInputWatermark(BoundedWindow.TIMESTAMP_MAX_VALUE);
 
-            fireEligibleTimers(timerInternals);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed advancing processing time!");
+                timerInternals.advanceProcessingTime(BoundedWindow.TIMESTAMP_MAX_VALUE);
+                timerInternals.advanceSynchronizedProcessingTime(BoundedWindow.TIMESTAMP_MAX_VALUE);
+
+                fireEligibleTimers(timerInternals);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed advancing processing time!");
+            }
         }
-
-        return super.complete();
+        return outputManager.tryFlush();
     }
 
     private void fireEligibleTimers(InMemoryTimerInternals timerInternals) {

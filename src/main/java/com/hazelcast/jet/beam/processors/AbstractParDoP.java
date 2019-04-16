@@ -79,7 +79,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
 
     private DoFnInvoker<InputT, OutputT> doFnInvoker;
     private SideInputHandler sideInputHandler;
-    private JetOutputManager outputManager;
+    JetOutputManager outputManager;
     private JetMetricsContainer metricsContainer;
     private SimpleInbox bufferedItems;
     private Set<Integer> completedSideInputs = new HashSet<>();
