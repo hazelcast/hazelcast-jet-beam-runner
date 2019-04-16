@@ -25,6 +25,7 @@ import com.hazelcast.jet.core.Outbox;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.function.SupplierEx;
+import org.apache.beam.runners.core.DoFnRunner;
 import org.apache.beam.runners.core.DoFnRunners;
 import org.apache.beam.runners.core.InMemoryStateInternals;
 import org.apache.beam.runners.core.NullSideInputReader;
@@ -33,6 +34,7 @@ import org.apache.beam.runners.core.SideInputReader;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.metrics.MetricsEnvironment;
+import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.reflect.DoFnInvoker;
 import org.apache.beam.sdk.transforms.reflect.DoFnInvokers;
@@ -40,6 +42,7 @@ import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
+import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
@@ -62,26 +65,28 @@ import static java.util.Collections.unmodifiableMap;
 
 abstract class AbstractParDoP<InputT, OutputT> implements Processor {
 
-    protected final SerializablePipelineOptions pipelineOptions;
-    protected final DoFn<InputT, OutputT> doFn;
-    protected final WindowingStrategy<?, ?> windowingStrategy;
-    protected final Map<TupleTag<?>, int[]> outputCollToOrdinals;
-    protected final TupleTag<OutputT> mainOutputTag;
-    protected final Coder<InputT> inputCoder;
-    protected final Map<TupleTag<?>, Coder<?>> outputCoderMap;
-    protected final Map<Integer, PCollectionView<?>> ordinalToSideInput;
-    protected final String ownerId; //do not remove, useful for debugging
+    private final SerializablePipelineOptions pipelineOptions;
+    private final DoFn<InputT, OutputT> doFn;
+    private final WindowingStrategy<?, ?> windowingStrategy;
+    private final Map<TupleTag<?>, int[]> outputCollToOrdinals;
+    private final TupleTag<OutputT> mainOutputTag;
+    private final Coder<InputT> inputCoder;
+    private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
+    private final Map<Integer, PCollectionView<?>> ordinalToSideInput;
+    private final String ownerId; //do not remove, useful for debugging
 
-    protected DoFnInvoker<InputT, OutputT> doFnInvoker;
-    protected SideInputHandler sideInputHandler;
-    protected JetOutputManager outputManager;
-    protected JetMetricsContainer metricsContainer;
-    protected SimpleInbox bufferedItems;
-    protected Set<Integer> completedSideInputs = new HashSet<>();
-    protected SideInputReader sideInputReader;
-    protected Outbox outbox;
+    DoFnRunner<InputT, OutputT> doFnRunner;
 
-    protected AbstractParDoP(
+    private DoFnInvoker<InputT, OutputT> doFnInvoker;
+    private SideInputHandler sideInputHandler;
+    private JetOutputManager outputManager;
+    private JetMetricsContainer metricsContainer;
+    private SimpleInbox bufferedItems;
+    private Set<Integer> completedSideInputs = new HashSet<>();
+    private SideInputReader sideInputReader;
+    private Outbox outbox;
+
+    AbstractParDoP(
             DoFn<InputT, OutputT> doFn,
             WindowingStrategy<?, ?> windowingStrategy,
             Map<TupleTag<?>, int[]> outputCollToOrdinals,
@@ -121,7 +126,32 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         }
 
         outputManager = new JetOutputManager(outbox, outputCollToOrdinals);
+
+        doFnRunner = getDoFnRunner(
+                pipelineOptions.get(),
+                doFn,
+                sideInputReader,
+                outputManager,
+                mainOutputTag,
+                Lists.newArrayList(outputCollToOrdinals.keySet()),
+                inputCoder,
+                outputCoderMap,
+                windowingStrategy
+        );
     }
+
+    protected abstract DoFnRunner<InputT,OutputT> getDoFnRunner(
+            PipelineOptions pipelineOptions,
+            DoFn<InputT, OutputT> doFn,
+            SideInputReader sideInputReader,
+            JetOutputManager outputManager,
+            TupleTag<OutputT> mainOutputTag,
+            List<TupleTag<?>> additionalOutputTags,
+            Coder<InputT> inputCoder,
+            Map<TupleTag<?>, Coder<?>> outputCoderMap,
+            WindowingStrategy<?, ?> windowingStrategy
+    );
+
 
     @Override
     public boolean isCooperative() {
@@ -160,7 +190,31 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         }
     }
 
-    protected abstract void processNonBufferedRegularItems(Inbox inbox);
+    private void processNonBufferedRegularItems(Inbox inbox) {
+        //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId); //useful for debugging
+        startRunnerBundle(doFnRunner);
+        for (WindowedValue<InputT> windowedValue; (windowedValue = (WindowedValue<InputT>) inbox.poll()) != null; ) {
+            //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
+            processElementWithRunner(doFnRunner, windowedValue);
+            if (!outputManager.tryFlush()) {
+                break;
+            }
+        }
+        finishRunnerBundle(doFnRunner);
+        // finishBundle can also add items to outputManager, they will be flushed in tryProcess() or complete()
+    }
+
+    protected void startRunnerBundle(DoFnRunner<InputT, OutputT> runner) {
+        runner.startBundle();
+    }
+
+    protected void processElementWithRunner(DoFnRunner<InputT, OutputT> runner, WindowedValue<InputT> windowedValue) {
+        runner.processElement(windowedValue);
+    }
+
+    protected void finishRunnerBundle(DoFnRunner<InputT, OutputT> runner) {
+        runner.finishBundle();
+    }
 
     @SuppressWarnings("unchecked")
     private void processBufferedRegularItems(Inbox inbox) {
@@ -259,18 +313,18 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
 
         protected final String ownerId;
 
-        protected final SerializablePipelineOptions pipelineOptions;
-        protected final DoFn<InputT, OutputT> doFn;
-        protected final WindowingStrategy<?, ?> windowingStrategy;
-        protected final TupleTag<OutputT> mainOutputTag;
-        protected final Map<TupleTag<?>, List<Integer>> outputCollToOrdinals;
-        protected final Coder<InputT> inputCoder;
-        protected final Map<TupleTag<?>, Coder<?>> outputCoderMap;
-        protected final List<PCollectionView<?>> sideInputs;
+        private final SerializablePipelineOptions pipelineOptions;
+        private final DoFn<InputT, OutputT> doFn;
+        private final WindowingStrategy<?, ?> windowingStrategy;
+        private final TupleTag<OutputT> mainOutputTag;
+        private final Map<TupleTag<?>, List<Integer>> outputCollToOrdinals;
+        private final Coder<InputT> inputCoder;
+        private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
+        private final List<PCollectionView<?>> sideInputs;
 
         private final Map<Integer, PCollectionView<?>> ordinalToSideInput = new HashMap<>();
 
-        protected AbstractSupplier(
+        AbstractSupplier(
                 String ownerId,
                 DoFn<InputT, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,

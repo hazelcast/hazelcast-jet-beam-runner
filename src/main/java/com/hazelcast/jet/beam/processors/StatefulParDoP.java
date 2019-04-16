@@ -16,23 +16,28 @@
 
 package com.hazelcast.jet.beam.processors;
 
-import com.hazelcast.jet.core.Inbox;
 import com.hazelcast.jet.core.Processor;
 import org.apache.beam.runners.core.DoFnRunner;
 import org.apache.beam.runners.core.DoFnRunners;
 import org.apache.beam.runners.core.InMemoryStateInternals;
+import org.apache.beam.runners.core.InMemoryTimerInternals;
+import org.apache.beam.runners.core.SideInputReader;
 import org.apache.beam.runners.core.StateInternals;
+import org.apache.beam.runners.core.StateNamespace;
+import org.apache.beam.runners.core.StateNamespaces;
 import org.apache.beam.runners.core.StepContext;
 import org.apache.beam.runners.core.TimerInternals;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
+import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
-import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
+import org.joda.time.Instant;
 
 import java.util.HashMap;
 import java.util.List;
@@ -41,10 +46,8 @@ import java.util.Set;
 
 public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
 
-    private final Map<Object, DoFnRunner<KV<?, ?>, OutputT>> runners = new HashMap<>();
-
-    private Object lastKey;
-    private DoFnRunner<KV<?, ?>, OutputT> lastRunner;
+    private KeyedStepContext keyedStepContext;
+    private InMemoryTimerInternals timerInternals;
 
     private StatefulParDoP(
             DoFn<KV<?, ?>, OutputT> doFn,
@@ -71,54 +74,91 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
     }
 
     @Override
-    protected void processNonBufferedRegularItems(Inbox inbox) {
-        //System.out.println(StatefulParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId); //useful for debugging
-
-        for (WindowedValue<KV<?, ?>> windowedValue; (windowedValue = (WindowedValue<KV<?, ?>>) inbox.poll()) != null; ) {
-            //System.out.println(StatefulParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
-            KV<?, ?> kv = windowedValue.getValue();
-
-            Object currentKey = kv.getKey();
-            if (lastKey == null) { //first item from the inbox in this round of processing
-                lastKey = currentKey;
-                lastRunner = getRunner(currentKey);
-                lastRunner.startBundle();
-            } else if (!lastKey.equals(currentKey)) { //not first item from inbox in this round of processing, key changes
-                lastRunner.finishBundle();
-                lastKey = currentKey;
-                lastRunner = getRunner(currentKey);
-                lastRunner.startBundle();
-            }
-
-            lastRunner.processElement(windowedValue);
-            if (!outputManager.tryFlush()) {
-                break;
-            }
-        }
-        if (lastRunner != null) lastRunner.finishBundle();
-
-        lastKey = null;
-        lastRunner = null;
-
-        //todo: this approach to batching might not be the most efficient one... can we extract all items with same key from Inbox?
+    protected DoFnRunner<KV<?, ?>, OutputT> getDoFnRunner(PipelineOptions pipelineOptions, DoFn<KV<?, ?>, OutputT> doFn, SideInputReader sideInputReader, JetOutputManager outputManager, TupleTag<OutputT> mainOutputTag, List<TupleTag<?>> additionalOutputTags, Coder<KV<?, ?>> inputCoder, Map<TupleTag<?>, Coder<?>> outputCoderMap, WindowingStrategy<?, ?> windowingStrategy) {
+        timerInternals = new InMemoryTimerInternals();
+        keyedStepContext = new KeyedStepContext(timerInternals);
+        return DoFnRunners.simpleRunner(
+                pipelineOptions,
+                doFn,
+                sideInputReader,
+                outputManager,
+                mainOutputTag,
+                additionalOutputTags,
+                keyedStepContext,
+                inputCoder,
+                outputCoderMap,
+                windowingStrategy
+        );
+        //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
+        //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
-    private DoFnRunner<KV<?, ?>, OutputT> getRunner(Object key) {
-        return runners.computeIfAbsent(
-                key,
-                k -> DoFnRunners.simpleRunner(
-                        pipelineOptions.get(),
-                        doFn,
-                        sideInputReader,
-                        outputManager,
-                        mainOutputTag,
-                        Lists.newArrayList(outputCollToOrdinals.keySet()),
-                        new KeyedStepContext(key),
-                        inputCoder,
-                        outputCoderMap,
-                        windowingStrategy
-                )
-        );
+    @Override
+    protected void startRunnerBundle(DoFnRunner<KV<?, ?>, OutputT> runner) {
+        try {
+            Instant now = Instant.now();
+            timerInternals.advanceProcessingTime(now);
+            timerInternals.advanceSynchronizedProcessingTime(now);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed advancing time!");
+        }
+
+        super.startRunnerBundle(runner);
+    }
+
+    @Override
+    protected void processElementWithRunner(DoFnRunner<KV<?, ?>, OutputT> runner, WindowedValue<KV<?, ?>> windowedValue) {
+        KV<?, ?> kv = windowedValue.getValue();
+        Object key = kv.getKey();
+        keyedStepContext.setKey(key);
+
+        super.processElementWithRunner(runner, windowedValue);
+    }
+
+    @Override
+    public boolean complete() {
+        try {
+            timerInternals.advanceInputWatermark(BoundedWindow.TIMESTAMP_MAX_VALUE);
+
+            timerInternals.advanceProcessingTime(BoundedWindow.TIMESTAMP_MAX_VALUE);
+            timerInternals.advanceSynchronizedProcessingTime(BoundedWindow.TIMESTAMP_MAX_VALUE);
+
+            fireEligibleTimers(timerInternals);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed advancing processing time!");
+        }
+
+        return super.complete();
+    }
+
+    private void fireEligibleTimers(InMemoryTimerInternals timerInternals) {
+        while (true) {
+            TimerInternals.TimerData timer;
+            boolean hasFired = false;
+
+            while ((timer = timerInternals.removeNextEventTimer()) != null) {
+                hasFired = true;
+                fireTimer(timer, doFnRunner);
+            }
+
+            while ((timer = timerInternals.removeNextProcessingTimer()) != null) {
+                hasFired = true;
+                fireTimer(timer, doFnRunner);
+            }
+
+            while ((timer = timerInternals.removeNextSynchronizedProcessingTimer()) != null) {
+                hasFired = true;
+                fireTimer(timer, doFnRunner);
+            }
+
+            if (!hasFired) break;
+        }
+    }
+
+    private static void fireTimer(TimerInternals.TimerData timer, DoFnRunner<KV<?, ?>, ?> doFnRunner) {
+        StateNamespace namespace = timer.getNamespace();
+        BoundedWindow window = ((StateNamespaces.WindowNamespace) namespace).getWindow();
+        doFnRunner.onTimer(timer.getTimerId(), window, timer.getTimestamp(), timer.getDomain());
     }
 
     public static class Supplier<OutputT> extends AbstractSupplier<KV<?, ?>, OutputT> {
@@ -175,22 +215,28 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
 
     private static class KeyedStepContext implements StepContext {
 
-        private final Object key;
-        private final StateInternals stateInternals;
+        private final Map<Object, InMemoryStateInternals> stateInternalsOfKeys;
+        private final InMemoryTimerInternals timerInternals;
 
-        KeyedStepContext(Object key) {
-            this.key = key;
-            stateInternals = InMemoryStateInternals.forKey(key);
+        private InMemoryStateInternals currentStateInternals;
+
+        KeyedStepContext(InMemoryTimerInternals timerInternals) {
+            this.stateInternalsOfKeys = new HashMap<>();
+            this.timerInternals = timerInternals;
+        }
+
+        void setKey(Object key) {
+            currentStateInternals = stateInternalsOfKeys.computeIfAbsent(key, InMemoryStateInternals::forKey);
         }
 
         @Override
         public StateInternals stateInternals() {
-            return stateInternals;
+            return currentStateInternals;
         }
 
         @Override
         public TimerInternals timerInternals() {
-            throw new UnsupportedOperationException("timerInternals is not supported");
+            return timerInternals;
         }
     }
 }

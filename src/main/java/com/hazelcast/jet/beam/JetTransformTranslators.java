@@ -161,7 +161,7 @@ class JetTransformTranslators {
 
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
-            String vertexId = dagBuilder.newVertexId(transformName);
+            String vertexId = dagBuilder.newVertexId(transformName) + (usesStateOrTimers ? " - STATEFUL" : "");
             SerializablePipelineOptions pipelineOptions = context.getOptions();
             Coder coder = ((PCollection) Utils.getInput(appliedTransform)).getCoder();
             List<PCollectionView<?>> sideInputs = Utils.getSideInputs(appliedTransform);

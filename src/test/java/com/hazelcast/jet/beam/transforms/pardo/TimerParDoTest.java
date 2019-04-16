@@ -60,10 +60,7 @@ import static org.junit.Assert.fail;
 @SuppressWarnings("ALL")
 public class TimerParDoTest extends AbstractParDoTest {
 
-    //todo: enable tests after state & timers are implemented
-
     @Test
-    @Ignore
     public void testEventTimeTimerBounded() {
         final String timerId = "foo";
 
@@ -95,7 +92,6 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testGbkFollowedByUserTimers() {
 
         DoFn<KV<String, Iterable<Integer>>, Integer> fn =
@@ -131,7 +127,6 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testEventTimeTimerAlignBounded() {
         final String timerId = "foo";
 
@@ -168,7 +163,6 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testTimerReceivedInOriginalWindow() {
         final String timerId = "foo";
 
@@ -214,7 +208,6 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testEventTimeTimerAbsolute() {
         final String timerId = "foo";
 
@@ -225,8 +218,7 @@ public class TimerParDoTest extends AbstractParDoTest {
                     private final TimerSpec spec = TimerSpecs.timer(TimeDomain.EVENT_TIME);
 
                     @ProcessElement
-                    public void processElement(
-                            @TimerId(timerId) Timer timer, BoundedWindow window, OutputReceiver<Integer> r) {
+                    public void processElement(@TimerId(timerId) Timer timer, BoundedWindow window, OutputReceiver<Integer> r) {
                         timer.set(window.maxTimestamp());
                         r.output(3);
                     }
@@ -317,13 +309,11 @@ public class TimerParDoTest extends AbstractParDoTest {
                             BoundedWindow window) {
                         timer.set(window.maxTimestamp());
                         state.write(context.element().getKey());
-                        context.output(
-                                KV.of(context.element().getKey(), context.element().getValue() + offset));
+                        context.output(KV.of(context.element().getKey(), context.element().getValue() + offset));
                     }
 
                     @OnTimer(timerId)
-                    public void onTimer(
-                            @StateId(stateId) ValueState<String> state, OutputReceiver<KV<String, Integer>> r) {
+                    public void onTimer(@StateId(stateId) ValueState<String> state, OutputReceiver<KV<String, Integer>> r) {
                         r.output(KV.of(state.read(), timerOutput));
                     }
                 };
@@ -354,7 +344,6 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testAbsoluteProcessingTimeTimerRejected() {
         final String timerId = "foo";
 
@@ -392,7 +381,6 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testOutOfBoundsEventTimeTimer() {
         final String timerId = "foo";
 
@@ -468,7 +456,6 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore // timers not supported
     public void testEventTimeTimerCanBeReset() {
         final String timerId = "foo";
 
@@ -506,7 +493,6 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testPipelineOptionsParameterOnTimer() {
         final String timerId = "thisTimer";
 
@@ -540,7 +526,6 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore // timers not supported
     public void duplicateTimerSetting() {
         TestStream<KV<String, String>> stream =
                 TestStream.create(KvCoder.of(StringUtf8Coder.of(), StringUtf8Coder.of()))

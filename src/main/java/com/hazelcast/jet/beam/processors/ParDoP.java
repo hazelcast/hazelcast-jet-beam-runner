@@ -16,31 +16,26 @@
 
 package com.hazelcast.jet.beam.processors;
 
-import com.hazelcast.jet.core.Inbox;
-import com.hazelcast.jet.core.Outbox;
 import com.hazelcast.jet.core.Processor;
 import org.apache.beam.runners.core.DoFnRunner;
 import org.apache.beam.runners.core.DoFnRunners;
+import org.apache.beam.runners.core.SideInputReader;
 import org.apache.beam.runners.core.StateInternals;
 import org.apache.beam.runners.core.StepContext;
 import org.apache.beam.runners.core.TimerInternals;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
+import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.transforms.DoFn;
-import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
-import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 
-import javax.annotation.Nonnull;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> {
-
-    private DoFnRunner<InputT, OutputT> doFnRunner;
 
     private ParDoP(
             DoFn<InputT, OutputT> doFn,
@@ -67,15 +62,14 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> {
     }
 
     @Override
-    public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
-        super.init(outbox, context);
-        doFnRunner = DoFnRunners.simpleRunner(
-                pipelineOptions.get(),
+    protected DoFnRunner<InputT, OutputT> getDoFnRunner(PipelineOptions pipelineOptions, DoFn<InputT, OutputT> doFn, SideInputReader sideInputReader, JetOutputManager outputManager, TupleTag<OutputT> mainOutputTag, List<TupleTag<?>> additionalOutputTags, Coder<InputT> inputCoder, Map<TupleTag<?>, Coder<?>> outputCoderMap, WindowingStrategy<?, ?> windowingStrategy) {
+        return DoFnRunners.simpleRunner(
+                pipelineOptions,
                 doFn,
                 sideInputReader,
                 outputManager,
                 mainOutputTag,
-                Lists.newArrayList(outputCollToOrdinals.keySet()),
+                additionalOutputTags,
                 new NotImplementedStepContext(),
                 inputCoder,
                 outputCoderMap,
@@ -83,21 +77,6 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> {
         );
         //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
         //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
-    }
-
-    @Override
-    protected void processNonBufferedRegularItems(Inbox inbox) {
-        //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId); //useful for debugging
-        doFnRunner.startBundle();
-        for (WindowedValue<InputT> windowedValue; (windowedValue = (WindowedValue<InputT>) inbox.poll()) != null; ) {
-            //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
-            doFnRunner.processElement(windowedValue);
-            if (!outputManager.tryFlush()) {
-                break;
-            }
-        }
-        doFnRunner.finishBundle();
-        // finishBundle can also add items to outputManager, they will be flushed in tryProcess() or complete()
     }
 
     public static class Supplier<InputT, OutputT> extends AbstractSupplier<InputT, OutputT> {

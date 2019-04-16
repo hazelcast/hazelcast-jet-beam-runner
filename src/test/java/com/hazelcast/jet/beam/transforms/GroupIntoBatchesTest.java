@@ -36,7 +36,6 @@ import org.apache.beam.sdk.values.TimestampedValue;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Iterables;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -80,7 +79,6 @@ public class GroupIntoBatchesTest extends AbstractTransformTest {
   }
 
   @Test
-  @Ignore // state or timers not supported
   public void testInGlobalWindow() {
     PCollection<KV<String, Iterable<String>>> collection =
         pipeline
@@ -115,7 +113,6 @@ public class GroupIntoBatchesTest extends AbstractTransformTest {
   }
 
   @Test
-  @Ignore // state or timers not supported
   public void testInStreamingMode() {
     int timestampInterval = 1;
     Instant startInstant = new Instant(0L);
