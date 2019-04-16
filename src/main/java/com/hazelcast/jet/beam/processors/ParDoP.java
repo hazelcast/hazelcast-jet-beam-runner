@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> {
+public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { //todo: unify with StatefulParDoP?
 
     private ParDoP(
             DoFn<InputT, OutputT> doFn,

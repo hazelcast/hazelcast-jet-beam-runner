@@ -46,7 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
+public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> { //todo: unify with ParDoP?
 
     private KeyedStepContext keyedStepContext;
     private InMemoryTimerInternals timerInternals;
