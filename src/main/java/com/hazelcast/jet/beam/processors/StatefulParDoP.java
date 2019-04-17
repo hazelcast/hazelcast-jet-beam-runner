@@ -128,17 +128,17 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
     }
 
     private boolean flushTimers(long watermark) {
-        if (watermark == BoundedWindow.TIMESTAMP_MAX_VALUE.getMillis()
-                && timerInternals.currentInputWatermarkTime().isBefore(BoundedWindow.TIMESTAMP_MAX_VALUE)) {
+        if (timerInternals.currentInputWatermarkTime().isBefore(watermark)) {
             try {
-                timerInternals.advanceInputWatermark(BoundedWindow.TIMESTAMP_MAX_VALUE);
-
-                timerInternals.advanceProcessingTime(BoundedWindow.TIMESTAMP_MAX_VALUE);
-                timerInternals.advanceSynchronizedProcessingTime(BoundedWindow.TIMESTAMP_MAX_VALUE);
-
+                Instant watermarkInstant = new Instant(watermark);
+                timerInternals.advanceInputWatermark(watermarkInstant);
+                if (watermarkInstant.equals(BoundedWindow.TIMESTAMP_MAX_VALUE)) {
+                    timerInternals.advanceProcessingTime(watermarkInstant);
+                    timerInternals.advanceSynchronizedProcessingTime(watermarkInstant);
+                }
                 fireEligibleTimers(timerInternals);
             } catch (Exception e) {
-                throw new RuntimeException("Failed advancing processing time!");
+                throw new RuntimeException("Failed advancing processing time", e);
             }
         }
         return outputManager.tryFlush();
