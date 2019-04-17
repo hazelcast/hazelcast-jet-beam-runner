@@ -30,6 +30,7 @@ import org.apache.beam.sdk.values.WindowingStrategy;
 import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
+import java.util.AbstractCollection;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -37,7 +38,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.function.BiFunction;
 
 import static com.hazelcast.jet.Traversers.traverseStream;
 
@@ -69,6 +69,7 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
                     .computeIfAbsent(key, k -> new ArrayList<>())
                     .add(windowedValue);
         }
+        mergeWindows(key);
         return true;
     }
 
@@ -84,7 +85,6 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
 
     private boolean flush(long timestamp, boolean appendWatermark) {
         if (flushTraverser == null) {
-            mergeWindows();
             Iterator<Map.Entry<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>>> iterator =
                     windowToKeyToList.entrySet().iterator();
 
@@ -110,7 +110,7 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
         return emitFromTraverser(flushTraverser);
     }
 
-    private void mergeWindows() {
+    private void mergeWindows(K key) {
         if (windowingStrategy.getWindowFn().isNonMerging()) {
             return;
         }
@@ -118,28 +118,32 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
             windowingStrategy.getWindowFn().mergeWindows(windowingStrategy.getWindowFn().new MergeContext() {
                 @Override
                 public Collection<BoundedWindow> windows() {
-                    return windowToKeyToList.keySet();
+                    return new WindowsForKeyCollection<>(windowToKeyToList, key);
                 }
 
                 @Override
                 public void merge(Collection<BoundedWindow> windowsFrom, BoundedWindow windowTo) {
-                    BiFunction<List<WindowedValue<KV<K, T>>>, List<WindowedValue<KV<K, T>>>, List<WindowedValue<KV<K, T>>>> mappingFn = mergeToFirstList();
+                    Map<K, List<WindowedValue<KV<K, T>>>> windowToData =
+                            windowToKeyToList.computeIfAbsent(windowTo, x -> new HashMap<>());
+                    List<WindowedValue<KV<K, T>>> toData = windowToData.get(key);
+
                     for (BoundedWindow windowFrom : windowsFrom) {
                         // shortcut - nothing to merge or change
                         if (windowFrom.equals(windowTo)) {
                             continue;
                         }
-                        Map<K, List<WindowedValue<KV<K, T>>>> windowToData =
-                                windowToKeyToList.computeIfAbsent(windowTo, x -> new HashMap<>());
-                        // shortcut - just move from one window to another
-                        Map<K, List<WindowedValue<KV<K, T>>>> windowFromData = windowToKeyToList.remove(windowFrom);
-                        assert windowFromData != null : "windowFromData == null";
-                        if (windowToData.isEmpty()) {
-                            windowToKeyToList.put(windowTo, windowFromData);
-                            continue;
+                        Map<K, List<WindowedValue<KV<K, T>>>> windowFromData = windowToKeyToList.get(windowFrom);
+                        List<WindowedValue<KV<K, T>>> fromData = windowFromData.remove(key);
+                        assert fromData != null : "fromData == null";
+                        if (windowFromData.isEmpty()) {
+                            // if the current key was the only key in the windowFrom, remove the window
+                            windowToKeyToList.remove(windowFrom);
                         }
-                        for (Entry<K, List<WindowedValue<KV<K, T>>>> entry : windowFromData.entrySet()) {
-                            windowToData.merge(entry.getKey(), entry.getValue(), mappingFn);
+                        if (toData == null) {
+                            toData = fromData;
+                            windowToData.put(key, fromData);
+                        } else {
+                            toData.addAll(fromData);
                         }
                     }
                 }
@@ -168,10 +172,62 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
         return () -> new WindowGroupP<>(windowingStrategy, ownerId);
     }
 
-    private static <T> BiFunction<List<T>, List<T>, List<T>> mergeToFirstList() {
-        return (first, second) -> {
-            first.addAll(second);
-            return first;
-        };
+    /**
+     * A utility to iterate windows in windowToKeyToList but only those that
+     * contain the given key with minimum garbage possible.
+     * <p>
+     * Only the {@link #iterator()} method is ever used on this class.
+     */
+    private static class WindowsForKeyCollection<K, T> extends AbstractCollection<BoundedWindow> {
+        private final Map<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>> windowToKeyToList;
+        private final K key;
+
+        WindowsForKeyCollection(Map<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>> windowToKeyToList, K key) {
+            this.windowToKeyToList = windowToKeyToList;
+            this.key = key;
+        }
+
+        @Override @Nonnull
+        public Iterator<BoundedWindow> iterator() {
+            return new Iterator<BoundedWindow>() {
+                private Iterator<Entry<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>>> iterator =
+                        windowToKeyToList.entrySet().iterator();
+                private BoundedWindow next;
+
+                // constructor
+                {
+                    advance();
+                }
+
+                @Override
+                public boolean hasNext() {
+                    return next != null;
+                }
+
+                @Override
+                public BoundedWindow next() {
+                    try {
+                        return next;
+                    } finally {
+                        advance();
+                    }
+                }
+
+                private void advance() {
+                    next = null;
+                    while (iterator.hasNext() && next == null) {
+                        Entry<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>> next1 = iterator.next();
+                        if (next1.getValue().containsKey(key)) {
+                            next = next1.getKey();
+                        }
+                    }
+                }
+            };
+        }
+
+        @Override
+        public int size() {
+            throw new UnsupportedOperationException();
+        }
     }
 }
