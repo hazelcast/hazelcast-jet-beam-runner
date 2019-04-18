@@ -17,17 +17,20 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
+import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;
 import com.hazelcast.nio.Address;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
+import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.io.BoundedSource;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.util.WindowedValue;
 
 import javax.annotation.Nonnull;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,16 +43,19 @@ import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 
 public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
 
+    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final Traverser<BoundedSource<T>> shardsTraverser;
     private final PipelineOptions options;
+    private final Coder outputCoder;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove it, very useful for debugging
 
     private BoundedSource.BoundedReader currentReader;
 
-    BoundedSourceP(List<BoundedSource<T>> shards, PipelineOptions options, String ownerId) {
+    BoundedSourceP(List<BoundedSource<T>> shards, PipelineOptions options, Coder outputCoder, String ownerId) {
         this.shardsTraverser = traverseIterable(shards);
         this.options = options;
+        this.outputCoder = outputCoder;
         this.ownerId = ownerId;
     }
 
@@ -69,7 +75,7 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
             if (!currentReader.advance()) {
                 nextShard();
             }
-            return res;
+            return outputCoder == null ? res : Utils.encodeWindowedValue(res, outputCoder, baos); //todo: this is not nice, have done this only as a quick fix for BoundedSourcePTest
         } catch (IOException e) {
             throw rethrow(e);
         }
@@ -116,15 +122,17 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
     public static <T> ProcessorMetaSupplier supplier(
             BoundedSource<T> boundedSource,
             SerializablePipelineOptions options,
+            Coder outputCoder,
             String ownerId
     ) {
-        return new BoundedSourceMetaProcessorSupplier<>(boundedSource, options, ownerId);
+        return new BoundedSourceMetaProcessorSupplier<>(boundedSource, options, outputCoder, ownerId);
     }
 
     private static class BoundedSourceMetaProcessorSupplier<T> implements ProcessorMetaSupplier {
 
         private final BoundedSource<T> boundedSource;
         private final SerializablePipelineOptions options;
+        private final Coder outputCoder;
         private final String ownerId;
 
         private transient List<? extends BoundedSource<T>> shards;
@@ -132,10 +140,12 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
         private BoundedSourceMetaProcessorSupplier(
                 BoundedSource<T> boundedSource,
                 SerializablePipelineOptions options,
+                Coder outputCoder,
                 String ownerId
         ) {
             this.boundedSource = boundedSource;
             this.options = options;
+            this.outputCoder = outputCoder;
             this.ownerId = ownerId;
         }
 
@@ -150,23 +160,26 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
         @Override
         public Function<? super Address, ? extends ProcessorSupplier> get(@Nonnull List<Address> addresses) {
             return address -> new BoundedSourceProcessorSupplier(
-                    roundRobinSubList(shards, addresses.indexOf(address), addresses.size()), options, ownerId);
+                    roundRobinSubList(shards, addresses.indexOf(address), addresses.size()), options, outputCoder, ownerId);
         }
     }
 
     private static class BoundedSourceProcessorSupplier<T> implements ProcessorSupplier {
         private final List<BoundedSource<T>> shards;
         private final SerializablePipelineOptions options;
+        private final Coder outputCoder;
         private final String ownerId;
         private transient ProcessorSupplier.Context context;
 
         private BoundedSourceProcessorSupplier(
                 List<BoundedSource<T>> shards,
                 SerializablePipelineOptions options,
+                Coder outputCoder,
                 String ownerId
         ) {
             this.shards = shards;
             this.options = options;
+            this.outputCoder = outputCoder;
             this.ownerId = ownerId;
         }
 
@@ -181,7 +194,7 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
             int indexBase = context.memberIndex() * context.localParallelism();
             List<Processor> res = new ArrayList<>(count);
             for (int i = 0; i < count; i++, indexBase++) {
-                res.add(new BoundedSourceP<>(roundRobinSubList(shards, i, count), options.get(), ownerId));
+                res.add(new BoundedSourceP<>(roundRobinSubList(shards, i, count), options.get(), outputCoder, ownerId));
             }
             return res;
         }

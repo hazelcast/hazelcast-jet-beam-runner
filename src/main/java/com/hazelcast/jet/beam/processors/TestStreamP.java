@@ -17,24 +17,33 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
+import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;
 import com.hazelcast.jet.core.Watermark;
+import org.apache.beam.sdk.coders.Coder;
+import org.apache.beam.sdk.testing.TestStream;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.joda.time.Instant;
 
 import javax.annotation.Nullable;
+import java.io.ByteArrayOutputStream;
 import java.io.Serializable;
 import java.util.List;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static com.hazelcast.jet.Traversers.traverseIterable;
+import static java.util.stream.Collectors.toList;
 
 public class TestStreamP extends AbstractProcessor {
+
+    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final Traverser traverser;
 
     @SuppressWarnings("unchecked")
-    private TestStreamP(List events) {
+    private TestStreamP(List events, Coder outputCoder) {
         traverser = traverseIterable(events)
                 .map(event -> {
                     if (event instanceof SerializableWatermarkEvent) {
@@ -46,7 +55,8 @@ public class TestStreamP extends AbstractProcessor {
                         return new Watermark(ts);
                     } else {
                         assert event instanceof SerializableTimestampedValue;
-                        return ((SerializableTimestampedValue) event).asWindowedValue();
+                        WindowedValue windowedValue = ((SerializableTimestampedValue) event).asWindowedValue();
+                        return Utils.encodeWindowedValue(windowedValue, outputCoder, baos);
                     }
                 });
     }
@@ -58,8 +68,24 @@ public class TestStreamP extends AbstractProcessor {
         return emitFromTraverser(traverser);
     }
 
-    public static ProcessorMetaSupplier supplier(List<Object> events) {
-        return ProcessorMetaSupplier.forceTotalParallelismOne(ProcessorSupplier.of(() -> new TestStreamP(events)));
+    public static <T> ProcessorMetaSupplier supplier(List<TestStream.Event<T>> events, Coder outputCoder) {
+        List<Object> serializableEvents = getSerializableEvents(events);
+        return ProcessorMetaSupplier.forceTotalParallelismOne(ProcessorSupplier.of(() -> new TestStreamP(serializableEvents, outputCoder)));
+    }
+
+    private static <T> List<Object> getSerializableEvents(List<TestStream.Event<T>> events) {
+        return events.stream()
+                .flatMap(e -> {
+                    if (e instanceof TestStream.WatermarkEvent) {
+                        return Stream.of(new SerializableWatermarkEvent(((TestStream.WatermarkEvent<T>) e).getWatermark().getMillis()));
+                    } else if (e instanceof TestStream.ElementEvent) {
+                        return StreamSupport.stream(((TestStream.ElementEvent<T>) e).getElements().spliterator(), false)
+                                .map(te -> new SerializableTimestampedValue<>(te.getValue(), te.getTimestamp()));
+                    } else {
+                        throw new UnsupportedOperationException("Event type not supported in TestStream: " + e.getClass() + ", event: " + e);
+                    }
+                })
+                .collect(toList());
     }
 
     public static class SerializableWatermarkEvent implements Serializable {

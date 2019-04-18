@@ -17,18 +17,20 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
+import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.function.SupplierEx;
+import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
 import org.apache.beam.sdk.transforms.windowing.TimestampCombiner;
 import org.apache.beam.sdk.util.WindowedValue;
-import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.WindowingStrategy;
 import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -43,18 +45,26 @@ import static com.hazelcast.jet.Traversers.traverseStream;
  */
 public class ViewP extends AbstractProcessor {
 
+    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final TimestampCombiner timestampCombiner;
-    private final PCollectionView view;
+    private final Coder inputCoder;
+    private final Coder outputCoder;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
 
     private Map<BoundedWindow, TimestampAndValues> values = new HashMap<>();
     private PaneInfo paneInfo = PaneInfo.NO_FIRING;
-    private Traverser<WindowedValue> resultTraverser;
+    private Traverser<byte[]> resultTraverser;
 
-    private ViewP(PCollectionView view, WindowingStrategy windowingStrategy, String ownerId) {
+    private ViewP(
+            Coder inputCoder,
+            Coder outputCoder,
+            WindowingStrategy windowingStrategy,
+            String ownerId
+    ) {
         this.timestampCombiner = windowingStrategy.getTimestampCombiner();
-        this.view = view;
+        this.inputCoder = inputCoder;
+        this.outputCoder = Utils.deriveIterableValueCoder((WindowedValue.FullWindowedValueCoder) outputCoder);
         this.ownerId = ownerId;
         //System.out.println(ViewP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
@@ -62,7 +72,7 @@ public class ViewP extends AbstractProcessor {
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
         //System.out.println(ViewP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
-        WindowedValue<?> windowedValue = (WindowedValue<?>) item;
+        WindowedValue<?> windowedValue = Utils.decodeWindowedValue((byte[]) item, inputCoder);
         for (BoundedWindow window : windowedValue.getWindows()) {
             values
                     .merge(window,
@@ -79,13 +89,29 @@ public class ViewP extends AbstractProcessor {
         //System.out.println(ViewP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         if (resultTraverser == null) {
             resultTraverser = traverseStream(
-                    values.entrySet().stream().map(e -> WindowedValue.of(e.getValue().values, e.getValue().timestamp, Collections.singleton(e.getKey()), paneInfo)));
+                    values.entrySet().stream().map(
+                            e -> {
+                                WindowedValue<?> outputValue = WindowedValue.of(
+                                        e.getValue().values,
+                                        e.getValue().timestamp,
+                                        Collections.singleton(e.getKey()),
+                                        paneInfo
+                                );
+                                return Utils.encodeWindowedValue(outputValue, outputCoder, baos);
+                            }
+                    )
+            );
         }
         return emitFromTraverser(resultTraverser);
     }
 
-    public static SupplierEx<Processor> supplier(PCollectionView<?> view, WindowingStrategy<?, ?> windowingStrategy, String ownerId) {
-        return () -> new ViewP(view, windowingStrategy, ownerId);
+    public static SupplierEx<Processor> supplier(
+            Coder inputCoder,
+            Coder outputCoder,
+            WindowingStrategy<?, ?> windowingStrategy,
+            String ownerId
+    ) {
+        return () -> new ViewP(inputCoder, outputCoder, windowingStrategy, ownerId);
     }
 
     public static class TimestampAndValues {

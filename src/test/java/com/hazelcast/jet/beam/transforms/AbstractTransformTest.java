@@ -65,13 +65,14 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
         TestJetRunner.JET_CLIENT_SUPPLIER = factory::newClient;
     }
 
-    private static JetInstance instance;
+    private static JetInstance instance1, instance2;
 
     @BeforeClass
     public static void beforeClass() {
         JetConfig config = new JetConfig();
         config.getHazelcastConfig().addEventJournalConfig(new EventJournalConfig().setMapName("map"));
-        instance = factory.newMember(config);
+        instance1 = factory.newMember(config);
+        instance2 = factory.newMember(config);
 
         printEnv();
     }

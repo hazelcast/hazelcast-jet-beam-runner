@@ -17,10 +17,12 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
+import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.function.SupplierEx;
+import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
 import org.apache.beam.sdk.transforms.windowing.TimestampCombiner;
@@ -30,6 +32,7 @@ import org.apache.beam.sdk.values.WindowingStrategy;
 import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
+import java.io.ByteArrayOutputStream;
 import java.util.AbstractCollection;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,6 +45,10 @@ import java.util.Map.Entry;
 import static com.hazelcast.jet.Traversers.traverseStream;
 
 public class WindowGroupP<T, K> extends AbstractProcessor {
+
+    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    private final Coder inputCoder;
+    private final Coder outputCoder;
     private final WindowingStrategy<T, BoundedWindow> windowingStrategy;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
@@ -49,7 +56,14 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
     private final Map<BoundedWindow, Map<K, List<WindowedValue<KV<K, T>>>>> windowToKeyToList = new HashMap<>();
     private Traverser<Object> flushTraverser;
 
-    private WindowGroupP(WindowingStrategy<T, BoundedWindow> windowingStrategy, String ownerId) {
+    private WindowGroupP(
+            Coder inputCoder,
+            Coder outputCoder,
+            WindowingStrategy<T, BoundedWindow> windowingStrategy,
+            String ownerId
+    ) {
+        this.inputCoder = inputCoder;
+        this.outputCoder = outputCoder;
         this.windowingStrategy = windowingStrategy;
         this.ownerId = ownerId;
         //System.out.println(WindowGroupP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
@@ -60,7 +74,7 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
         //System.out.println(WindowGroupP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
         assert ordinal == 0;
-        WindowedValue<KV<K, T>> windowedValue = (WindowedValue) item;
+        WindowedValue<KV<K, T>> windowedValue = Utils.decodeWindowedValue((byte[]) item, inputCoder);
         K key = windowedValue.getValue().getKey();
 
         for (BoundedWindow window : windowedValue.getWindows()) {
@@ -153,7 +167,7 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
         }
     }
 
-    private WindowedValue<KV<K, List<T>>> createOutput(K key, BoundedWindow window, List<WindowedValue<KV<K, T>>> windowedValues) {
+    private byte[] createOutput(K key, BoundedWindow window, List<WindowedValue<KV<K, T>>> windowedValues) {
         assert !windowedValues.isEmpty() : "empty windowedValues";
         Instant timestamp = null;
         List<T> values = new ArrayList<>(windowedValues.size());
@@ -164,12 +178,18 @@ public class WindowGroupP<T, K> extends AbstractProcessor {
                     : timestampCombiner.merge(window, timestamp, windowedValue.getTimestamp());
             values.add(windowedValue.getValue().getValue());
         }
-        return WindowedValue.of(KV.of(key, values), timestamp, window, PaneInfo.NO_FIRING);
+        WindowedValue<KV<K, List<T>>> windowedValue = WindowedValue.of(KV.of(key, values), timestamp, window, PaneInfo.NO_FIRING);
+        return Utils.encodeWindowedValue(windowedValue, outputCoder, baos);
     }
 
     @SuppressWarnings("unchecked")
-    public static SupplierEx<Processor> supplier(WindowingStrategy windowingStrategy, String ownerId) {
-        return () -> new WindowGroupP<>(windowingStrategy, ownerId);
+    public static SupplierEx<Processor> supplier(
+            Coder inputCoder,
+            Coder outputCoder,
+            WindowingStrategy windowingStrategy,
+            String ownerId
+    ) {
+        return () -> new WindowGroupP<>(inputCoder, outputCoder, windowingStrategy, ownerId);
     }
 
     /**

@@ -16,29 +16,73 @@
 
 package com.hazelcast.jet.beam.processors;
 
+import com.hazelcast.jet.beam.DAGBuilder;
+import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
+import com.hazelcast.jet.core.Edge;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.function.SupplierEx;
+import org.apache.beam.sdk.coders.Coder;
+import org.apache.beam.sdk.util.WindowedValue;
 
 import javax.annotation.Nonnull;
+import java.io.ByteArrayOutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 public class FlattenP extends AbstractProcessor {
 
+    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    private final Map<Integer, Coder> inputOrdinalCoders;
+    private final Coder outputCoder;
     @SuppressWarnings("FieldCanBeLocal") //do not remove, useful for debugging
     private final String ownerId;
 
-    private FlattenP(String ownerId) {
+    private FlattenP(Map<Integer, Coder> inputOrdinalCoders, Coder outputCoder, String ownerId) {
+        this.inputOrdinalCoders = inputOrdinalCoders;
+        this.outputCoder = outputCoder;
         this.ownerId = ownerId;
         //System.out.println(FlattenP.class.getSimpleName() + " CREATE, ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
-        //System.out.println(FlattenP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
-        return tryEmit(item);
+        Coder inputCoder = inputOrdinalCoders.get(ordinal);
+        WindowedValue<Object> windowedValue = Utils.decodeWindowedValue((byte[]) item, inputCoder);
+        //System.out.println(FlattenP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
+        return tryEmit(Utils.encodeWindowedValue(windowedValue, outputCoder, baos));
     }
 
-    public static SupplierEx<Processor> supplier(String ownerId) {
-        return () -> new FlattenP(ownerId);
+    public static final class Supplier implements SupplierEx<Processor>, DAGBuilder.WiringListener {
+
+        private final Map<String, Coder> inputCollectionCoders;
+        private final Coder outputCoder;
+        private final String ownerId;
+        private final Map<Integer, Coder> inputOrdinalCoders;
+
+        public Supplier(Map<String, Coder> inputCoders, Coder outputCoder, String ownerId) {
+            this.inputCollectionCoders = inputCoders;
+            this.outputCoder = outputCoder;
+            this.ownerId = ownerId;
+            this.inputOrdinalCoders = new HashMap<>();
+        }
+
+        @Override
+        public Processor getEx() throws Exception {
+            return new FlattenP(inputOrdinalCoders, outputCoder, ownerId);
+        }
+
+        @Override
+        public void isOutboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId) {
+            //do nothing
+        }
+
+        @Override
+        public void isInboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId) {
+            if (ownerId.equals(vertexId)) {
+                Coder coder = inputCollectionCoders.get(edgeId);
+                inputOrdinalCoders.put(edge.getDestOrdinal(), coder);
+            }
+        }
     }
 }

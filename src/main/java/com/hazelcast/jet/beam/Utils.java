@@ -20,12 +20,14 @@ import org.apache.beam.runners.core.construction.ParDoTranslation;
 import org.apache.beam.runners.core.construction.TransformInputs;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.Coder;
+import org.apache.beam.sdk.coders.ListCoder;
 import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
+import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.PValue;
@@ -42,9 +44,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 import static java.util.stream.Collectors.toList;
 import static org.apache.beam.vendor.guava.v20_0.com.google.common.base.Preconditions.checkState;
 
@@ -93,7 +97,25 @@ public class Utils {
         return ((PCollection) getOutput(appliedTransform).getValue()).isBounded().equals(PCollection.IsBounded.BOUNDED);
     }
 
-    static Map<TupleTag<?>, Coder<?>> getOutputCoders(AppliedPTransform<?, ?, ?> appliedTransform) {
+    static Coder getCoder(PCollection pCollection) {
+        if (pCollection.getWindowingStrategy() == null) {
+            return pCollection.getCoder();
+        } else {
+            return WindowedValue.FullWindowedValueCoder.of(pCollection.getCoder(), pCollection.getWindowingStrategy().getWindowFn().windowCoder());
+        }
+    }
+
+    static <T> Map<T, Coder> getCoders(Map<TupleTag<?>, PValue> pCollections, Function<Map.Entry<TupleTag<?>, PValue>, T> tupleTagExtractor) {
+        return pCollections.entrySet().stream()
+                .collect(
+                        Collectors.toMap(
+                                tupleTagExtractor,
+                                e -> getCoder((PCollection) e.getValue())
+                        )
+                );
+    }
+
+    static Map<TupleTag<?>, Coder<?>> getOutputValueCoders(AppliedPTransform<?, ?, ?> appliedTransform) {
         return appliedTransform
                 .getOutputs()
                 .entrySet()
@@ -169,9 +191,9 @@ public class Utils {
             throw new IllegalArgumentException("index=" + index + ", count=" + count);
         }
         return IntStream.range(0, list.size())
-                        .filter(i -> i % count == index)
-                        .mapToObj(list::get)
-                        .collect(toList());
+                .filter(i -> i % count == index)
+                .mapToObj(list::get)
+                .collect(toList());
     }
 
     /**
@@ -191,5 +213,30 @@ public class Utils {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static <T> byte[] encodeWindowedValue(WindowedValue<T> windowedValue, Coder coder, ByteArrayOutputStream baos) {
+        try {
+            baos.reset();
+            coder.encode(windowedValue, baos);
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw rethrow(e);
+        }
+    }
+
+    public static <T> WindowedValue<T> decodeWindowedValue(byte[] item, Coder coder) {
+        try {
+            return (WindowedValue<T>) coder.decode(new ByteArrayInputStream(item));
+        } catch (IOException e) {
+            throw rethrow(e);
+        }
+    }
+
+    public static WindowedValue.FullWindowedValueCoder deriveIterableValueCoder(WindowedValue.FullWindowedValueCoder elementCoder) {
+        return WindowedValue.FullWindowedValueCoder.of(
+                ListCoder.of(elementCoder.getValueCoder()),
+                elementCoder.getWindowCoder()
+        );
     }
 }

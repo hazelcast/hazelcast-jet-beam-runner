@@ -23,8 +23,6 @@ import com.hazelcast.jet.beam.processors.ImpulseP;
 import com.hazelcast.jet.beam.processors.ParDoP;
 import com.hazelcast.jet.beam.processors.StatefulParDoP;
 import com.hazelcast.jet.beam.processors.TestStreamP;
-import com.hazelcast.jet.beam.processors.TestStreamP.SerializableTimestampedValue;
-import com.hazelcast.jet.beam.processors.TestStreamP.SerializableWatermarkEvent;
 import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.Processor;
@@ -42,8 +40,6 @@ import org.apache.beam.sdk.io.BoundedSource;
 import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy.Node;
 import org.apache.beam.sdk.testing.TestStream;
-import org.apache.beam.sdk.testing.TestStream.ElementEvent;
-import org.apache.beam.sdk.testing.TestStream.WatermarkEvent;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
@@ -66,10 +62,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
-
-import static java.util.stream.Collectors.toList;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("unchecked")
 class JetTransformTranslators {
@@ -114,12 +107,13 @@ class JetTransformTranslators {
             }
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            Coder outputCoder = Utils.getCoder((PCollection) Utils.getOutput(appliedTransform).getValue());
 
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
             SerializablePipelineOptions pipelineOptions = context.getOptions();
-            ProcessorMetaSupplier processorSupplier = BoundedSourceP.supplier(source, pipelineOptions, vertexId);
+            ProcessorMetaSupplier processorSupplier = BoundedSourceP.supplier(source, pipelineOptions, outputCoder, vertexId);
 
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
@@ -157,14 +151,17 @@ class JetTransformTranslators {
             }
             final WindowingStrategy<?, ?> windowingStrategy = Utils.getWindowingStrategy(appliedTransform);
 
-            Map<TupleTag<?>, Coder<?>> outputCoderMap = Utils.getOutputCoders(appliedTransform);
+            Map<TupleTag<?>, Coder<?>> outputValueCoders = Utils.getOutputValueCoders(appliedTransform);
+            Map<TupleTag<?>, Coder> outputCoders = Utils.getCoders(Utils.getOutputs(appliedTransform), Map.Entry::getKey);
 
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName) + (usesStateOrTimers ? " - STATEFUL" : "");
             SerializablePipelineOptions pipelineOptions = context.getOptions();
-            Coder coder = ((PCollection) Utils.getInput(appliedTransform)).getCoder();
+            Coder inputCoder = Utils.getCoder(Utils.getInput(appliedTransform));
             List<PCollectionView<?>> sideInputs = Utils.getSideInputs(appliedTransform);
+            Map<? extends PCollectionView<?>, Coder> sideInputCoders = sideInputs.stream()
+                    .collect(Collectors.toMap(si -> si, si -> Utils.getCoder(si.getPCollection())));
             SupplierEx<Processor> processorSupplier = usesStateOrTimers ?
                     new StatefulParDoP.Supplier(
                             vertexId,
@@ -173,8 +170,10 @@ class JetTransformTranslators {
                             pipelineOptions,
                             mainOutputTag,
                             outputMap.keySet(),
-                            coder,
-                            outputCoderMap,
+                            inputCoder,
+                            sideInputCoders,
+                            outputCoders,
+                            outputValueCoders,
                             sideInputs
                     ) :
                     new ParDoP.Supplier(
@@ -184,8 +183,10 @@ class JetTransformTranslators {
                             pipelineOptions,
                             mainOutputTag,
                             outputMap.keySet(),
-                            coder,
-                            outputCoderMap,
+                            inputCoder,
+                            sideInputCoders,
+                            outputCoders,
+                            outputValueCoders,
                             sideInputs
                     );
 
@@ -219,23 +220,22 @@ class JetTransformTranslators {
 
         @Override
         public Vertex translate(Pipeline pipeline, Node node, JetTranslationContext context) {
-            // todo type arguments are wrong here, but we don't care
             AppliedPTransform<PCollection<K>, PCollection<InputT>, PTransform<PCollection<K>, PCollection<InputT>>> appliedTransform =
                     (AppliedPTransform<PCollection<K>, PCollection<InputT>, PTransform<PCollection<K>, PCollection<InputT>>>) node.toAppliedPTransform(pipeline);
             String transformName = appliedTransform.getFullName();
 
             PCollection<KV<K, InputT>> input = Utils.getInput(appliedTransform);
+            Coder inputCoder = Utils.getCoder(input);
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
             assert input != null : "null input";
 
             WindowingStrategy<InputT, ? extends BoundedWindow> outputWindowingStrategy =
                     (WindowingStrategy<InputT, ? extends BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
             WindowingStrategy<?, ?> windowingStrategy = input.getWindowingStrategy();
             Trigger trigger = outputWindowingStrategy.getTrigger();
-            if (!trigger.isCompatible(DefaultTrigger.of())
-                    && !trigger.isCompatible(Never.ever())) {
-                throw new UnsupportedOperationException("Only DefaultTrigger and Never.NeverTrigger supported, got "
-                        + trigger);
+            if (!trigger.isCompatible(DefaultTrigger.of()) && !trigger.isCompatible(Never.ever())) {
+                throw new UnsupportedOperationException("Only DefaultTrigger and Never.NeverTrigger supported, got " + trigger);
             }
             if (outputWindowingStrategy.getAllowedLateness().getMillis() != 0) {
                 throw new UnsupportedOperationException("Non-zero allowed lateness not supported");
@@ -243,7 +243,7 @@ class JetTransformTranslators {
 
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
-            Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(windowingStrategy, vertexId));
+            Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(inputCoder, outputCoder, windowingStrategy, vertexId));
 
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
 
@@ -262,7 +262,7 @@ class JetTransformTranslators {
                     (AppliedPTransform<PCollection<T>, PCollection<T>, PTransform<PCollection<T>, PCollection<T>>>) node.toAppliedPTransform(pipeline);
             PCollectionView<T> view;
             try {
-                view = CreatePCollectionViewTranslation.getView(appliedTransform); //todo: there is no SDK-agnostic specification for this; using it means your runner is tied to Java
+                view = CreatePCollectionViewTranslation.getView(appliedTransform);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -271,8 +271,11 @@ class JetTransformTranslators {
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
             PCollection<T> input = Utils.getInput(appliedTransform);
+            Coder inputCoder = Utils.getCoder(input);
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
 
-            Vertex vertex = dagBuilder.addVertex(vertexId, ViewP.supplier(view, input.getWindowingStrategy(), vertexId));
+            Vertex vertex = dagBuilder.addVertex(vertexId, ViewP.supplier(inputCoder, outputCoder, input.getWindowingStrategy(), vertexId));
 
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
 
@@ -280,7 +283,6 @@ class JetTransformTranslators {
             dagBuilder.registerCollectionOfEdge(viewTag, view.getTagInternal().getId());
             dagBuilder.registerEdgeStartPoint(viewTag, vertex);
 
-            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             String outputEdgeId = Utils.getTupleTagId(output.getValue());
             dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
@@ -294,17 +296,23 @@ class JetTransformTranslators {
         public Vertex translate(Pipeline pipeline, Node node, JetTranslationContext context) {
             AppliedPTransform<?, ?, ?> appliedTransform = node.toAppliedPTransform(pipeline);
 
-            DAGBuilder dagBuilder = context.getDagBuilder();
-            String vertexId = dagBuilder.newVertexId(appliedTransform.getFullName());
-            Vertex vertex = dagBuilder.addVertex(vertexId, FlattenP.supplier(vertexId));
 
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
+            Map<String, Coder> inputCoders = Utils.getCoders(Utils.getInputs(appliedTransform), e -> Utils.getTupleTagId(e.getValue()));
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
+
+            DAGBuilder dagBuilder = context.getDagBuilder();
+            String vertexId = dagBuilder.newVertexId(appliedTransform.getFullName());
+            FlattenP.Supplier processorSupplier = new FlattenP.Supplier(inputCoders, outputCoder, vertexId);
+            Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
+            dagBuilder.registerConstructionListeners(processorSupplier);
+
             for (PValue value : mainInputs) {
                 PCollection<T> input = (PCollection<T>) value;
                 dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
             }
 
-            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             String outputEdgeId = Utils.getTupleTagId(output.getValue());
             dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
@@ -320,16 +328,18 @@ class JetTransformTranslators {
             WindowingStrategy<T, BoundedWindow> windowingStrategy =
                     (WindowingStrategy<T, BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
 
+            PCollection<WindowedValue> input = Utils.getInput(appliedTransform);
+            Coder inputCoder = Utils.getCoder(input);
+            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            Coder outputCoder = Utils.getCoder((PCollection) Utils.getOutput(appliedTransform).getValue());
+
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
 
-            Vertex vertex = dagBuilder.addVertex(vertexId, AssignWindowP.supplier(windowingStrategy, vertexId));
-
-            PCollection<WindowedValue> input = Utils.getInput(appliedTransform);
+            Vertex vertex = dagBuilder.addVertex(vertexId, AssignWindowP.supplier(inputCoder, outputCoder, windowingStrategy, vertexId));
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
 
-            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             String outputEdgeId = Utils.getTupleTagId(output.getValue());
             dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);
@@ -368,21 +378,10 @@ class JetTransformTranslators {
             TestStream<T> transform = (TestStream<T>) appliedTransform.getTransform();
 
             // events in the transform are not serializable, we have to translate them. We'll also flatten the collection.
-            List<Object> serializableEvents = transform.getEvents().stream()
-                    .flatMap(e -> {
-                        if (e instanceof TestStream.WatermarkEvent) {
-                            return Stream.of(new SerializableWatermarkEvent(((WatermarkEvent<T>) e).getWatermark().getMillis()));
-                        } else if (e instanceof TestStream.ElementEvent) {
-                            return StreamSupport.stream(((ElementEvent<T>) e).getElements().spliterator(), false)
-                                    .map(te -> new SerializableTimestampedValue<>(te.getValue(), te.getTimestamp()));
-                        } else {
-                            throw new UnsupportedOperationException("Event type not supported in TestStream: " + e.getClass() + ", event: " + e);
-                        }
-                    })
-                    .collect(toList());
-            Vertex vertex = dagBuilder.addVertex(vertexId, TestStreamP.supplier(serializableEvents));
-
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
+            Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
+            Vertex vertex = dagBuilder.addVertex(vertexId, TestStreamP.supplier(transform.getEvents(), outputCoder));
+
             String outputEdgeId = Utils.getTupleTagId(output.getValue());
             dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex);

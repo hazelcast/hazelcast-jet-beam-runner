@@ -46,6 +46,7 @@ import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,7 +72,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     private final Map<TupleTag<?>, int[]> outputCollToOrdinals;
     private final TupleTag<OutputT> mainOutputTag;
     private final Coder<InputT> inputCoder;
-    private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
+    private final Map<PCollectionView<?>, Coder<?>> sideInputCoders;
+    private final Map<TupleTag<?>, Coder<?>> outputCoders;
+    private final Map<TupleTag<?>, Coder<?>> outputValueCoders;
     private final Map<Integer, PCollectionView<?>> ordinalToSideInput;
     private final String ownerId; //do not remove, useful for debugging
 
@@ -93,7 +96,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             SerializablePipelineOptions pipelineOptions,
             TupleTag<OutputT> mainOutputTag,
             Coder<InputT> inputCoder,
-            Map<TupleTag<?>, Coder<?>> outputCoderMap,
+            Map<PCollectionView<?>, Coder<?>> sideInputCoders,
+            Map<TupleTag<?>, Coder<?>> outputCoders,
+            Map<TupleTag<?>, Coder<?>> outputValueCoders,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
             String ownerId
     ) {
@@ -103,7 +108,15 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         this.outputCollToOrdinals = outputCollToOrdinals;
         this.mainOutputTag = mainOutputTag;
         this.inputCoder = inputCoder;
-        this.outputCoderMap = outputCoderMap;
+        this.sideInputCoders = sideInputCoders.entrySet().stream()
+                .collect(
+                        Collectors.toMap(
+                                e -> e.getKey(),
+                                e -> Utils.deriveIterableValueCoder((WindowedValue.FullWindowedValueCoder) e.getValue())
+                        )
+                );
+        this.outputCoders = outputCoders;
+        this.outputValueCoders = outputValueCoders;
         this.ordinalToSideInput = ordinalToSideInput;
         this.ownerId = ownerId;
     }
@@ -125,7 +138,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             sideInputReader = sideInputHandler;
         }
 
-        outputManager = new JetOutputManager(outbox, outputCollToOrdinals);
+        outputManager = new JetOutputManager(outbox, outputCoders, outputCollToOrdinals);
 
         doFnRunner = getDoFnRunner(
                 pipelineOptions.get(),
@@ -135,12 +148,12 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 mainOutputTag,
                 Lists.newArrayList(outputCollToOrdinals.keySet()),
                 inputCoder,
-                outputCoderMap,
+                outputValueCoders,
                 windowingStrategy
         );
     }
 
-    protected abstract DoFnRunner<InputT,OutputT> getDoFnRunner(
+    protected abstract DoFnRunner<InputT, OutputT> getDoFnRunner(
             PipelineOptions pipelineOptions,
             DoFn<InputT, OutputT> doFn,
             SideInputReader sideInputReader,
@@ -148,7 +161,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             TupleTag<OutputT> mainOutputTag,
             List<TupleTag<?>> additionalOutputTags,
             Coder<InputT> inputCoder,
-            Map<TupleTag<?>, Coder<?>> outputCoderMap,
+            Map<TupleTag<?>, Coder<?>> outputValueCoders,
             WindowingStrategy<?, ?> windowingStrategy
     );
 
@@ -185,16 +198,17 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     }
 
     private void processSideInput(PCollectionView<?> sideInputView, Inbox inbox) {
-        for (WindowedValue<Iterable<?>> value; (value = (WindowedValue) inbox.poll()) != null; ) {
-            sideInputHandler.addSideInputValue(sideInputView, value);
+        for (byte[] value; (value = (byte[]) inbox.poll()) != null; ) {
+            Coder<?> sideInputCoder = sideInputCoders.get(sideInputView);
+            WindowedValue<Iterable<?>> windowedValue = Utils.decodeWindowedValue(value, sideInputCoder);
+            sideInputHandler.addSideInputValue(sideInputView, windowedValue);
         }
     }
 
     private void processNonBufferedRegularItems(Inbox inbox) {
-        //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId); //useful for debugging
         startRunnerBundle(doFnRunner);
-        for (WindowedValue<InputT> windowedValue; (windowedValue = (WindowedValue<InputT>) inbox.poll()) != null; ) {
-            //System.out.println(ParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
+        for (byte[] value; (value = (byte[]) inbox.poll()) != null; ) {
+            WindowedValue<InputT> windowedValue = Utils.decodeWindowedValue(value, inputCoder);
             processElementWithRunner(doFnRunner, windowedValue);
             if (!outputManager.tryFlush()) {
                 break;
@@ -205,10 +219,12 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     }
 
     protected void startRunnerBundle(DoFnRunner<InputT, OutputT> runner) {
+        //System.out.println(AbstractParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId); //useful for debugging
         runner.startBundle();
     }
 
     protected void processElementWithRunner(DoFnRunner<InputT, OutputT> runner, WindowedValue<InputT> windowedValue) {
+        //System.out.println(AbstractParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
         runner.processElement(windowedValue);
     }
 
@@ -218,8 +234,8 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
 
     @SuppressWarnings("unchecked")
     private void processBufferedRegularItems(Inbox inbox) {
-        for (WindowedValue<InputT> windowedValue; (windowedValue = (WindowedValue<InputT>) inbox.poll()) != null; ) {
-            bufferedItems.add(windowedValue);
+        for (byte[] value; (value = (byte[]) inbox.poll()) != null; ) {
+            bufferedItems.add(value);
         }
     }
 
@@ -263,7 +279,10 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
      * output ordinal, and a way to drain to outbox ({@link #tryFlush()}).
      */
     static class JetOutputManager implements DoFnRunners.OutputManager {
+
+        private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         private final Outbox outbox;
+        private final Map<TupleTag<?>, Coder<?>> outputCoders;
         private final Map<TupleTag<?>, int[]> outputCollToOrdinals;
         private final List<Object>[] outputBuckets;
 
@@ -271,8 +290,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         private int currentBucket, currentItem;
 
         @SuppressWarnings("unchecked")
-        JetOutputManager(Outbox outbox, Map<TupleTag<?>, int[]> outputCollToOrdinals) {
+        JetOutputManager(Outbox outbox, Map<TupleTag<?>, Coder<?>> outputCoders, Map<TupleTag<?>, int[]> outputCollToOrdinals) {
             this.outbox = outbox;
+            this.outputCoders = outputCoders;
             this.outputCollToOrdinals = outputCollToOrdinals;
             assert !outputCollToOrdinals.isEmpty();
             int maxOrdinal = outputCollToOrdinals.values().stream().flatMapToInt(IntStream::of).max().orElse(-1);
@@ -281,8 +301,10 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         }
 
         @Override
-        public <T> void output(TupleTag<T> tag, WindowedValue<T> output) {
+        public <T> void output(TupleTag<T> tag, WindowedValue<T> outputValue) {
             assert currentBucket == 0 && currentItem == 0 : "adding output while flushing";
+            Coder<?> coder = outputCoders.get(tag);
+            byte[] output = Utils.encodeWindowedValue(outputValue, coder, baos);
             for (int ordinal : outputCollToOrdinals.get(tag)) {
                 outputBuckets[ordinal].add(output);
             }
@@ -319,7 +341,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         private final TupleTag<OutputT> mainOutputTag;
         private final Map<TupleTag<?>, List<Integer>> outputCollToOrdinals;
         private final Coder<InputT> inputCoder;
-        private final Map<TupleTag<?>, Coder<?>> outputCoderMap;
+        private final Map<PCollectionView<?>, Coder<?>> sideInputCoders;
+        private final Map<TupleTag<?>, Coder<?>> outputCoders;
+        private final Map<TupleTag<?>, Coder<?>> outputValueCoders;
         private final List<PCollectionView<?>> sideInputs;
 
         private final Map<Integer, PCollectionView<?>> ordinalToSideInput = new HashMap<>();
@@ -332,7 +356,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 TupleTag<OutputT> mainOutputTag,
                 Set<TupleTag<OutputT>> allOutputTags,
                 Coder<InputT> inputCoder,
-                Map<TupleTag<?>, Coder<?>> outputCoderMap,
+                Map<PCollectionView<?>, Coder<?>> sideInputCoders,
+                Map<TupleTag<?>, Coder<?>> outputCoders,
+                Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 List<PCollectionView<?>> sideInputs
         ) {
             this.ownerId = ownerId;
@@ -342,7 +368,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             this.outputCollToOrdinals = allOutputTags.stream().collect(Collectors.toMap(Function.identity(), t -> new ArrayList<>()));
             this.mainOutputTag = mainOutputTag;
             this.inputCoder = inputCoder;
-            this.outputCoderMap = outputCoderMap;
+            this.sideInputCoders = sideInputCoders;
+            this.outputCoders = outputCoders;
+            this.outputValueCoders = outputValueCoders;
             this.sideInputs = sideInputs;
         }
 
@@ -356,7 +384,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                     pipelineOptions,
                     mainOutputTag,
                     inputCoder,
-                    unmodifiableMap(outputCoderMap),
+                    unmodifiableMap(sideInputCoders),
+                    unmodifiableMap(outputCoders),
+                    unmodifiableMap(outputValueCoders),
                     unmodifiableMap(ordinalToSideInput),
                     ownerId
             );
@@ -369,7 +399,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
                 Coder<InputT> inputCoder,
-                Map<TupleTag<?>, Coder<?>> outputCoderMap,
+                Map<PCollectionView<?>, Coder<?>> sideInputCoders,
+                Map<TupleTag<?>, Coder<?>> outputCoders,
+                Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
                 String ownerId
         );

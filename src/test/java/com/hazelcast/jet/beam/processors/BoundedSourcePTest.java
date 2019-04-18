@@ -38,7 +38,7 @@ public class BoundedSourcePTest {
     @Test
     public void testEmpty() {
         TestSupport
-                .verifyProcessor(() -> new BoundedSourceP<>(emptyList(), null, null))
+                .verifyProcessor(() -> new BoundedSourceP<>(emptyList(), null, null, null))
                 .disableSnapshots()
                 .expectOutput(emptyList());
     }
@@ -49,7 +49,7 @@ public class BoundedSourcePTest {
                 asList(new MockBoundedSource(0, 100), new MockBoundedSource(100, 200));
 
         TestSupport
-                .verifyProcessor(() -> new BoundedSourceP<>(shards, null, null))
+                .verifyProcessor(() -> new BoundedSourceP<>(shards, null, null, null))
                 .disableSnapshots()
                 .outputChecker(TestSupport.SAME_ITEMS_ANY_ORDER)
                 .expectOutput(IntStream

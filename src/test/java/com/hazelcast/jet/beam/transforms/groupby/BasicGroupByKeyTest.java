@@ -238,11 +238,6 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
         runLargeKeysTest(pipeline, 10 << 20);
     }
 
-    @Test
-    public void testLargeKeys100MB() {
-        runLargeKeysTest(pipeline, 100 << 20);
-    }
-
     private static void runLargeKeysTest(TestPipeline pipeline, final int keySize) {
         PCollection<KV<String, Integer>> result =
                 pipeline.apply(Create.of("a", "a", "b"))

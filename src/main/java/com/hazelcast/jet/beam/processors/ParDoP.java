@@ -44,7 +44,9 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
             SerializablePipelineOptions pipelineOptions,
             TupleTag<OutputT> mainOutputTag,
             Coder<InputT> inputCoder,
-            Map<TupleTag<?>, Coder<?>> outputCoderMap,
+            Map<PCollectionView<?>, Coder<?>> sideInputCoders,
+            Map<TupleTag<?>, Coder<?>> outputCoders,
+            Map<TupleTag<?>, Coder<?>> outputValueCoders,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
             String ownerId
     ) {
@@ -55,14 +57,25 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 pipelineOptions,
                 mainOutputTag,
                 inputCoder,
-                outputCoderMap,
+                sideInputCoders,
+                outputCoders,
+                outputValueCoders,
                 ordinalToSideInput,
                 ownerId
         );
     }
 
     @Override
-    protected DoFnRunner<InputT, OutputT> getDoFnRunner(PipelineOptions pipelineOptions, DoFn<InputT, OutputT> doFn, SideInputReader sideInputReader, JetOutputManager outputManager, TupleTag<OutputT> mainOutputTag, List<TupleTag<?>> additionalOutputTags, Coder<InputT> inputCoder, Map<TupleTag<?>, Coder<?>> outputCoderMap, WindowingStrategy<?, ?> windowingStrategy) {
+    protected DoFnRunner<InputT, OutputT> getDoFnRunner(
+            PipelineOptions pipelineOptions,
+            DoFn<InputT, OutputT> doFn,
+            SideInputReader sideInputReader,
+            JetOutputManager outputManager,
+            TupleTag<OutputT> mainOutputTag, List<TupleTag<?>> additionalOutputTags,
+            Coder<InputT> inputCoder,
+            Map<TupleTag<?>, Coder<?>> outputValueCoders,
+            WindowingStrategy<?, ?> windowingStrategy
+    ) {
         return DoFnRunners.simpleRunner(
                 pipelineOptions,
                 doFn,
@@ -72,7 +85,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 additionalOutputTags,
                 new NotImplementedStepContext(),
                 inputCoder,
-                outputCoderMap,
+                outputValueCoders,
                 windowingStrategy
         );
         //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
@@ -89,7 +102,9 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 TupleTag<OutputT> mainOutputTag,
                 Set<TupleTag<OutputT>> allOutputTags,
                 Coder<InputT> inputCoder,
-                Map<TupleTag<?>, Coder<?>> outputCoderMap,
+                Map<PCollectionView<?>, Coder<?>> sideInputCoders,
+                Map<TupleTag<?>, Coder<?>> outputCoders,
+                Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 List<PCollectionView<?>> sideInputs
         ) {
             super(
@@ -100,7 +115,9 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                     mainOutputTag,
                     allOutputTags,
                     inputCoder,
-                    outputCoderMap,
+                    sideInputCoders,
+                    outputCoders,
+                    outputValueCoders,
                     sideInputs
             );
         }
@@ -113,7 +130,9 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
                 Coder<InputT> inputCoder,
-                Map<TupleTag<?>, Coder<?>> outputCoderMap,
+                Map<PCollectionView<?>, Coder<?>> sideInputCoders,
+                Map<TupleTag<?>, Coder<?>> outputCoders,
+                Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
                 String ownerId
         ) {
@@ -124,7 +143,9 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                     pipelineOptions,
                     mainOutputTag,
                     inputCoder,
-                    outputCoderMap,
+                    sideInputCoders,
+                    outputCoders,
+                    outputValueCoders,
                     ordinalToSideInput,
                     ownerId
             );

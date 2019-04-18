@@ -1291,7 +1291,8 @@ public class ViewTest extends AbstractTransformTest {
                                         new DoFn<String, String>() {
                                             @ProcessElement
                                             public void processElement(ProcessContext c) {
-                                                c.output(c.element() + c.sideInput(view));
+                                                Integer integer = c.sideInput(view);
+                                                c.output(c.element() + integer);
                                             }
                                         })
                                         .withSideInputs(view));

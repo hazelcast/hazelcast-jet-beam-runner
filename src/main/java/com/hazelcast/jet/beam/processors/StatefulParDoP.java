@@ -58,7 +58,9 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
             SerializablePipelineOptions pipelineOptions,
             TupleTag<OutputT> mainOutputTag,
             Coder<KV<?, ?>> inputCoder,
-            Map<TupleTag<?>, Coder<?>> outputCoderMap,
+            Map<PCollectionView<?>, Coder<?>> sideInputCoders,
+            Map<TupleTag<?>, Coder<?>> outputCoders,
+            Map<TupleTag<?>, Coder<?>> outputValueCoders,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
             String ownerId
     ) {
@@ -69,14 +71,26 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 pipelineOptions,
                 mainOutputTag,
                 inputCoder,
-                outputCoderMap,
+                sideInputCoders,
+                outputCoders,
+                outputValueCoders,
                 ordinalToSideInput,
                 ownerId
         );
     }
 
     @Override
-    protected DoFnRunner<KV<?, ?>, OutputT> getDoFnRunner(PipelineOptions pipelineOptions, DoFn<KV<?, ?>, OutputT> doFn, SideInputReader sideInputReader, JetOutputManager outputManager, TupleTag<OutputT> mainOutputTag, List<TupleTag<?>> additionalOutputTags, Coder<KV<?, ?>> inputCoder, Map<TupleTag<?>, Coder<?>> outputCoderMap, WindowingStrategy<?, ?> windowingStrategy) {
+    protected DoFnRunner<KV<?, ?>, OutputT> getDoFnRunner(
+            PipelineOptions pipelineOptions,
+            DoFn<KV<?, ?>, OutputT> doFn,
+            SideInputReader sideInputReader,
+            JetOutputManager outputManager,
+            TupleTag<OutputT> mainOutputTag,
+            List<TupleTag<?>> additionalOutputTags,
+            Coder<KV<?, ?>> inputCoder,
+            Map<TupleTag<?>, Coder<?>> outputValueCoders,
+            WindowingStrategy<?, ?> windowingStrategy
+    ) {
         timerInternals = new InMemoryTimerInternals();
         keyedStepContext = new KeyedStepContext(timerInternals);
         return DoFnRunners.simpleRunner(
@@ -88,7 +102,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 additionalOutputTags,
                 keyedStepContext,
                 inputCoder,
-                outputCoderMap,
+                outputValueCoders,
                 windowingStrategy
         );
         //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
@@ -184,7 +198,9 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 TupleTag<OutputT> mainOutputTag,
                 Set<TupleTag<OutputT>> allOutputTags,
                 Coder<KV<?, ?>> inputCoder,
-                Map<TupleTag<?>, Coder<?>> outputCoderMap,
+                Map<PCollectionView<?>, Coder<?>> sideInputCoders,
+                Map<TupleTag<?>, Coder<?>> outputCoders,
+                Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 List<PCollectionView<?>> sideInputs
         ) {
             super(
@@ -195,7 +211,9 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                     mainOutputTag,
                     allOutputTags,
                     inputCoder,
-                    outputCoderMap,
+                    sideInputCoders,
+                    outputCoders,
+                    outputValueCoders,
                     sideInputs
             );
         }
@@ -208,7 +226,9 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
                 Coder<KV<?, ?>> inputCoder,
-                Map<TupleTag<?>, Coder<?>> outputCoderMap,
+                Map<PCollectionView<?>, Coder<?>> sideInputCoders,
+                Map<TupleTag<?>, Coder<?>> outputCoders,
+                Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
                 String ownerId
         ) {
@@ -219,7 +239,9 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                     pipelineOptions,
                     mainOutputTag,
                     inputCoder,
-                    outputCoderMap,
+                    sideInputCoders,
+                    outputCoders,
+                    outputValueCoders,
                     ordinalToSideInput,
                     ownerId
             );

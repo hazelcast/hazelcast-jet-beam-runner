@@ -16,10 +16,12 @@
 
 package com.hazelcast.jet.beam.processors;
 
+import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ResettableSingletonTraverser;
 import com.hazelcast.jet.function.SupplierEx;
+import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.WindowFn;
 import org.apache.beam.sdk.util.WindowedValue;
@@ -28,31 +30,40 @@ import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Iterables;
 import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
+import java.io.ByteArrayOutputStream;
 import java.util.Collection;
 
 public class AssignWindowP<InputT> extends AbstractProcessor {
 
-    private final String ownerId;
+    @SuppressWarnings("FieldCanBeLocal")
+    private final String ownerId; //do not remove, useful for debugging
 
-    private final ResettableSingletonTraverser<WindowedValue<InputT>> traverser = new ResettableSingletonTraverser<>();
-    private final FlatMapper<WindowedValue<InputT>, WindowedValue<InputT>> flatMapper;
+    private final ResettableSingletonTraverser<byte[]> traverser = new ResettableSingletonTraverser<>();
+    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    private final FlatMapper<byte[], byte[]> flatMapper;
     private final WindowAssignContext<InputT> windowAssignContext;
 
-    private AssignWindowP(String ownerId, WindowingStrategy<InputT, BoundedWindow> windowingStrategy) {
+    private AssignWindowP(
+            Coder inputCoder,
+            Coder outputCoder,
+            WindowingStrategy<InputT, BoundedWindow> windowingStrategy,
+            String ownerId
+    ) {
         this.ownerId = ownerId;
 
         windowAssignContext = new WindowAssignContext<>(windowingStrategy.getWindowFn());
 
         flatMapper = flatMapper(item -> {
             Collection<BoundedWindow> windows;
-            windowAssignContext.setValue(item);
+            WindowedValue<InputT> inputValue = Utils.decodeWindowedValue(item, inputCoder);
+            windowAssignContext.setValue(inputValue);
             try {
                 windows = windowingStrategy.getWindowFn().assignWindows(windowAssignContext);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            WindowedValue<InputT> w = WindowedValue.of(item.getValue(), item.getTimestamp(), windows, item.getPane());
-            traverser.accept(w);
+            WindowedValue<InputT> outputValue = WindowedValue.of(inputValue.getValue(), inputValue.getTimestamp(), windows, inputValue.getPane());
+            traverser.accept(Utils.encodeWindowedValue(outputValue, outputCoder, baos));
             return traverser;
         });
     }
@@ -60,11 +71,16 @@ public class AssignWindowP<InputT> extends AbstractProcessor {
     @SuppressWarnings("unchecked")
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
-        return flatMapper.tryProcess((WindowedValue<InputT>) item);
+        return flatMapper.tryProcess((byte[]) item);
     }
 
-    public static <InputT> SupplierEx<Processor> supplier(WindowingStrategy<InputT, BoundedWindow> windowingStrategy, String ownerId) {
-        return () -> new AssignWindowP<>(ownerId, windowingStrategy);
+    public static <InputT> SupplierEx<Processor> supplier(
+            Coder inputCoder,
+            Coder outputCoder,
+            WindowingStrategy<InputT, BoundedWindow> windowingStrategy,
+            String ownerId
+    ) {
+        return () -> new AssignWindowP<>(inputCoder, outputCoder, windowingStrategy, ownerId);
     }
 
     private static class WindowAssignContext<InputT> extends WindowFn<InputT, BoundedWindow>.AssignContext {
