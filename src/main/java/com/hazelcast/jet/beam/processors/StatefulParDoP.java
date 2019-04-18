@@ -60,6 +60,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
             Coder<KV<?, ?>> inputCoder,
             Map<PCollectionView<?>, Coder<?>> sideInputCoders,
             Map<TupleTag<?>, Coder<?>> outputCoders,
+            Coder<KV<?, ?>> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
             String ownerId
@@ -73,6 +74,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 inputCoder,
                 sideInputCoders,
                 outputCoders,
+                inputValueCoder,
                 outputValueCoders,
                 ordinalToSideInput,
                 ownerId
@@ -87,7 +89,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
             JetOutputManager outputManager,
             TupleTag<OutputT> mainOutputTag,
             List<TupleTag<?>> additionalOutputTags,
-            Coder<KV<?, ?>> inputCoder,
+            Coder<KV<?, ?>> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
             WindowingStrategy<?, ?> windowingStrategy
     ) {
@@ -101,7 +103,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 mainOutputTag,
                 additionalOutputTags,
                 keyedStepContext,
-                inputCoder,
+                inputValueCoder,
                 outputValueCoders,
                 windowingStrategy
         );
@@ -200,6 +202,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 Coder<KV<?, ?>> inputCoder,
                 Map<PCollectionView<?>, Coder<?>> sideInputCoders,
                 Map<TupleTag<?>, Coder<?>> outputCoders,
+                Coder<KV<?, ?>> inputValueCoder,
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 List<PCollectionView<?>> sideInputs
         ) {
@@ -213,6 +216,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                     inputCoder,
                     sideInputCoders,
                     outputCoders,
+                    inputValueCoder,
                     outputValueCoders,
                     sideInputs
             );
@@ -228,6 +232,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 Coder<KV<?, ?>> inputCoder,
                 Map<PCollectionView<?>, Coder<?>> sideInputCoders,
                 Map<TupleTag<?>, Coder<?>> outputCoders,
+                Coder<KV<?, ?>> inputValueCoder,
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
                 String ownerId
@@ -241,6 +246,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                     inputCoder,
                     sideInputCoders,
                     outputCoders,
+                    inputValueCoder,
                     outputValueCoders,
                     ordinalToSideInput,
                     ownerId

@@ -46,7 +46,6 @@ import static org.junit.Assert.assertTrue;
 public class SchemaParDoTest extends AbstractParDoTest {
 
     @Test
-    @Ignore //todo
     public void testSimpleSchemaPipeline() {
         List<MyPojo> pojoList =
                 Lists.newArrayList(new MyPojo("a", 1), new MyPojo("b", 2), new MyPojo("c", 3));
@@ -77,7 +76,6 @@ public class SchemaParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore //todo
     public void testReadAndWrite() {
         List<MyPojo> pojoList =
                 Lists.newArrayList(new MyPojo("a", 1), new MyPojo("b", 2), new MyPojo("c", 3));
@@ -130,7 +128,6 @@ public class SchemaParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore //todo
     public void testReadAndWriteMultiOutput() {
         List<MyPojo> pojoList =
                 Lists.newArrayList(new MyPojo("a", 1), new MyPojo("b", 2), new MyPojo("c", 3));
@@ -225,7 +222,6 @@ public class SchemaParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore //todo
     public void testReadAndWriteWithSchemaRegistry() {
         Schema schema =
                 Schema.builder().addStringField("string_field").addInt32Field("integer_field").build();
@@ -271,7 +267,6 @@ public class SchemaParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore //todo
     public void testFieldAccessSchemaPipeline() {
         List<MyPojo> pojoList =
                 Lists.newArrayList(new MyPojo("a", 1), new MyPojo("b", 2), new MyPojo("c", 3));
@@ -306,7 +301,6 @@ public class SchemaParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore //todo
     public void testInferredSchemaPipeline() {
         List<InferredPojo> pojoList =
                 Lists.newArrayList(
@@ -329,7 +323,6 @@ public class SchemaParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore //todo
     public void testSchemasPassedThrough() {
         List<InferredPojo> pojoList =
                 Lists.newArrayList(

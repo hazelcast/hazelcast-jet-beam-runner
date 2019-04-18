@@ -74,6 +74,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     private final Coder<InputT> inputCoder;
     private final Map<PCollectionView<?>, Coder<?>> sideInputCoders;
     private final Map<TupleTag<?>, Coder<?>> outputCoders;
+    private final Coder<InputT> inputValueCoder;
     private final Map<TupleTag<?>, Coder<?>> outputValueCoders;
     private final Map<Integer, PCollectionView<?>> ordinalToSideInput;
     private final String ownerId; //do not remove, useful for debugging
@@ -98,6 +99,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             Coder<InputT> inputCoder,
             Map<PCollectionView<?>, Coder<?>> sideInputCoders,
             Map<TupleTag<?>, Coder<?>> outputCoders,
+            Coder<InputT> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
             String ownerId
@@ -116,6 +118,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                         )
                 );
         this.outputCoders = outputCoders;
+        this.inputValueCoder = inputValueCoder;
         this.outputValueCoders = outputValueCoders;
         this.ordinalToSideInput = ordinalToSideInput;
         this.ownerId = ownerId;
@@ -147,7 +150,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 outputManager,
                 mainOutputTag,
                 Lists.newArrayList(outputCollToOrdinals.keySet()),
-                inputCoder,
+                inputValueCoder,
                 outputValueCoders,
                 windowingStrategy
         );
@@ -160,7 +163,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             JetOutputManager outputManager,
             TupleTag<OutputT> mainOutputTag,
             List<TupleTag<?>> additionalOutputTags,
-            Coder<InputT> inputCoder,
+            Coder<InputT> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
             WindowingStrategy<?, ?> windowingStrategy
     );
@@ -343,6 +346,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         private final Coder<InputT> inputCoder;
         private final Map<PCollectionView<?>, Coder<?>> sideInputCoders;
         private final Map<TupleTag<?>, Coder<?>> outputCoders;
+        private final Coder<InputT> inputValueCoder;
         private final Map<TupleTag<?>, Coder<?>> outputValueCoders;
         private final List<PCollectionView<?>> sideInputs;
 
@@ -358,6 +362,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 Coder<InputT> inputCoder,
                 Map<PCollectionView<?>, Coder<?>> sideInputCoders,
                 Map<TupleTag<?>, Coder<?>> outputCoders,
+                Coder<InputT> inputValueCoder,
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 List<PCollectionView<?>> sideInputs
         ) {
@@ -370,6 +375,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             this.inputCoder = inputCoder;
             this.sideInputCoders = sideInputCoders;
             this.outputCoders = outputCoders;
+            this.inputValueCoder = inputValueCoder;
             this.outputValueCoders = outputValueCoders;
             this.sideInputs = sideInputs;
         }
@@ -386,6 +392,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                     inputCoder,
                     unmodifiableMap(sideInputCoders),
                     unmodifiableMap(outputCoders),
+                    inputValueCoder,
                     unmodifiableMap(outputValueCoders),
                     unmodifiableMap(ordinalToSideInput),
                     ownerId
@@ -401,6 +408,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 Coder<InputT> inputCoder,
                 Map<PCollectionView<?>, Coder<?>> sideInputCoders,
                 Map<TupleTag<?>, Coder<?>> outputCoders,
+                Coder<InputT> inputValueCoder,
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
                 String ownerId

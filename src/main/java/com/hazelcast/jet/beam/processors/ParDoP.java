@@ -46,6 +46,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
             Coder<InputT> inputCoder,
             Map<PCollectionView<?>, Coder<?>> sideInputCoders,
             Map<TupleTag<?>, Coder<?>> outputCoders,
+            Coder<InputT> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
             String ownerId
@@ -59,6 +60,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 inputCoder,
                 sideInputCoders,
                 outputCoders,
+                inputValueCoder,
                 outputValueCoders,
                 ordinalToSideInput,
                 ownerId
@@ -72,7 +74,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
             SideInputReader sideInputReader,
             JetOutputManager outputManager,
             TupleTag<OutputT> mainOutputTag, List<TupleTag<?>> additionalOutputTags,
-            Coder<InputT> inputCoder,
+            Coder<InputT> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
             WindowingStrategy<?, ?> windowingStrategy
     ) {
@@ -84,7 +86,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 mainOutputTag,
                 additionalOutputTags,
                 new NotImplementedStepContext(),
-                inputCoder,
+                inputValueCoder,
                 outputValueCoders,
                 windowingStrategy
         );
@@ -104,6 +106,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 Coder<InputT> inputCoder,
                 Map<PCollectionView<?>, Coder<?>> sideInputCoders,
                 Map<TupleTag<?>, Coder<?>> outputCoders,
+                Coder<InputT> inputValueCoder,
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 List<PCollectionView<?>> sideInputs
         ) {
@@ -117,6 +120,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                     inputCoder,
                     sideInputCoders,
                     outputCoders,
+                    inputValueCoder,
                     outputValueCoders,
                     sideInputs
             );
@@ -132,6 +136,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 Coder<InputT> inputCoder,
                 Map<PCollectionView<?>, Coder<?>> sideInputCoders,
                 Map<TupleTag<?>, Coder<?>> outputCoders,
+                Coder<InputT> inputValueCoder,
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
                 String ownerId
@@ -145,6 +150,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                     inputCoder,
                     sideInputCoders,
                     outputCoders,
+                    inputValueCoder,
                     outputValueCoders,
                     ordinalToSideInput,
                     ownerId

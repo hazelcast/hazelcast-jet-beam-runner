@@ -158,6 +158,7 @@ class JetTransformTranslators {
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName) + (usesStateOrTimers ? " - STATEFUL" : "");
             SerializablePipelineOptions pipelineOptions = context.getOptions();
+            Coder inputValueCoder = ((PCollection) Utils.getInput(appliedTransform)).getCoder();
             Coder inputCoder = Utils.getCoder(Utils.getInput(appliedTransform));
             List<PCollectionView<?>> sideInputs = Utils.getSideInputs(appliedTransform);
             Map<? extends PCollectionView<?>, Coder> sideInputCoders = sideInputs.stream()
@@ -173,6 +174,7 @@ class JetTransformTranslators {
                             inputCoder,
                             sideInputCoders,
                             outputCoders,
+                            inputValueCoder,
                             outputValueCoders,
                             sideInputs
                     ) :
@@ -186,6 +188,7 @@ class JetTransformTranslators {
                             inputCoder,
                             sideInputCoders,
                             outputCoders,
+                            inputValueCoder,
                             outputValueCoders,
                             sideInputs
                     );
