@@ -61,11 +61,9 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         try {
             normalize(pipeline);
             DAG dag = translate(pipeline);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug(dag.toString());
-            }
             return run(dag);
         } catch (UnsupportedOperationException uoe) {
+            LOG.error("Failed running pipeline!", uoe);
             return new FailedRunningPipelineResults(uoe);
         }
     }

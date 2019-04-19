@@ -81,17 +81,7 @@ class JetGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
     ) {
         @SuppressWarnings("unchecked")
         JetTransformTranslator<T> typedTranslator = (JetTransformTranslator<T>) translator;
-        Vertex vertex = typedTranslator.translate(getPipeline(), node, translationContext);
-
-        // attach peeking (for debugging)
-//        if (vertex.getName().equals("2 (View.AsIterable/View.CreatePCollectionView)")) {
-//            System.out.println("attaching peek");
-//            vertex.updateMetaSupplier(supplier -> {
-//                supplier = DiagnosticProcessors.peekInputP(supplier);
-//                supplier = DiagnosticProcessors.peekOutputP(supplier);
-//                return supplier;
-//            });
-//        }
+        typedTranslator.translate(getPipeline(), node, translationContext);
     }
 
 }

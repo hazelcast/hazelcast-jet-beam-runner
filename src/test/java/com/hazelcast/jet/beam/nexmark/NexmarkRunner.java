@@ -25,7 +25,8 @@ import java.io.IOException;
 public class NexmarkRunner {
 
     public static void main(String[] args) throws IOException {
-        JetInstance jet = Jet.newJetInstance(); //todo: make the number of instances configurable
+        JetInstance jet1 = Jet.newJetInstance();
+        JetInstance jet2 = Jet.newJetInstance(); //todo: make the number of instances configurable
         try {
             Main.main(args);
         } finally {
