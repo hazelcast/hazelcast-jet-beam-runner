@@ -25,24 +25,29 @@ import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.ImmutableLis
 
 /**
  * Contains the {@link PipelineRunnerRegistrar} and {@link PipelineOptionsRegistrar} for the {@link
- * JetRunner}.
+ * TestJetRunner}.
  *
  * <p>{@link AutoService} will register Apex's implementations of the {@link PipelineRunner} and
  * {@link PipelineOptions} as available pipeline runner services.
  */
-public final class JetRunnerRegistrar {
-    private JetRunnerRegistrar() {}
+public final class JetTestRunnerRegistrar {
+    private JetTestRunnerRegistrar() {
+    }
 
-    /** Registers the {@link JetRunner}. */
+    /**
+     * Registers the {@link JetRunner}.
+     */
     @AutoService(PipelineRunnerRegistrar.class)
     public static class Runner implements PipelineRunnerRegistrar {
         @Override
         public Iterable<Class<? extends PipelineRunner<?>>> getPipelineRunners() {
-            return ImmutableList.of(JetRunner.class);
+            return ImmutableList.of(TestJetRunner.class);
         }
     }
 
-    /** Registers the {@link JetPipelineOptions}. */
+    /**
+     * Registers the {@link JetPipelineOptions}.
+     */
     @AutoService(PipelineOptionsRegistrar.class)
     public static class Options implements PipelineOptionsRegistrar {
         @Override

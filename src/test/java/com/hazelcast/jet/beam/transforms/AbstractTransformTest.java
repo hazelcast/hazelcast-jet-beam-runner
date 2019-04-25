@@ -55,31 +55,12 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
         jetOptions.setJetGroupName(JetConfig.DEFAULT_GROUP_NAME);
         jetOptions.setJetLocalParallelism(2);
         options.setRunner(TestJetRunner.class);
-//        options.setRunner(DirectRunner.class);
         return TestPipeline.fromOptions(options);
     }
 
-    private static JetTestInstanceFactory factory = new JetTestInstanceFactory();
-
-    static {
-        TestJetRunner.JET_CLIENT_SUPPLIER = factory::newClient;
-    }
-
-    private static JetInstance instance1, instance2;
-
     @BeforeClass
     public static void beforeClass() {
-        JetConfig config = new JetConfig();
-        config.getHazelcastConfig().addEventJournalConfig(new EventJournalConfig().setMapName("map"));
-        instance1 = factory.newMember(config);
-        instance2 = factory.newMember(config);
-
         printEnv();
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        factory.shutdownAll();
     }
 
     private static void printEnv() {
