@@ -63,7 +63,8 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
             Coder<KV<?, ?>> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
-            String ownerId
+            String ownerId,
+            String stepId
     ) {
         super(
                 doFn,
@@ -77,7 +78,8 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 inputValueCoder,
                 outputValueCoders,
                 ordinalToSideInput,
-                ownerId
+                ownerId,
+                stepId
         );
     }
 
@@ -193,6 +195,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
     public static class Supplier<OutputT> extends AbstractSupplier<KV<?, ?>, OutputT> {
 
         public Supplier(
+                String stepId,
                 String ownerId,
                 DoFn<KV<?, ?>, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
@@ -207,6 +210,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 List<PCollectionView<?>> sideInputs
         ) {
             super(
+                    stepId,
                     ownerId,
                     doFn,
                     windowingStrategy,
@@ -235,7 +239,8 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 Coder<KV<?, ?>> inputValueCoder,
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
-                String ownerId
+                String ownerId,
+                String stepId
         ) {
             return new StatefulParDoP<>(
                     doFn,
@@ -249,7 +254,8 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                     inputValueCoder,
                     outputValueCoders,
                     ordinalToSideInput,
-                    ownerId
+                    ownerId,
+                    stepId
             );
         }
     }

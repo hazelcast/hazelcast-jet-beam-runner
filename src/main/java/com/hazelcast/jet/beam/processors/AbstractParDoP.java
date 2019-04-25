@@ -78,6 +78,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     private final Map<TupleTag<?>, Coder<?>> outputValueCoders;
     private final Map<Integer, PCollectionView<?>> ordinalToSideInput;
     private final String ownerId; //do not remove, useful for debugging
+    private final String stepId;
 
     DoFnRunner<InputT, OutputT> doFnRunner;
 
@@ -102,7 +103,8 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             Coder<InputT> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
-            String ownerId
+            String ownerId,
+            String stepId
     ) {
         this.pipelineOptions = pipelineOptions;
         this.doFn = serde(doFn);
@@ -122,12 +124,13 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         this.outputValueCoders = outputValueCoders;
         this.ordinalToSideInput = ordinalToSideInput;
         this.ownerId = ownerId;
+        this.stepId = stepId;
     }
 
     @Override
     public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
         this.outbox = outbox;
-        metricsContainer = new JetMetricsContainer(ownerId, context);
+        metricsContainer = new JetMetricsContainer(stepId, context);
         MetricsEnvironment.setCurrentContainer(metricsContainer); //todo: this is correct only as long as the processor is non-cooperative
 
         doFnInvoker = DoFnInvokers.invokerFor(doFn);
@@ -337,6 +340,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     abstract static class AbstractSupplier<InputT, OutputT> implements SupplierEx<Processor>, DAGBuilder.WiringListener {
 
         protected final String ownerId;
+        private final String stepId;
 
         private final SerializablePipelineOptions pipelineOptions;
         private final DoFn<InputT, OutputT> doFn;
@@ -353,6 +357,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         private final Map<Integer, PCollectionView<?>> ordinalToSideInput = new HashMap<>();
 
         AbstractSupplier(
+                String stepId,
                 String ownerId,
                 DoFn<InputT, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
@@ -366,6 +371,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 List<PCollectionView<?>> sideInputs
         ) {
+            this.stepId = stepId;
             this.ownerId = ownerId;
             this.pipelineOptions = pipelineOptions;
             this.doFn = doFn;
@@ -395,7 +401,8 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                     inputValueCoder,
                     unmodifiableMap(outputValueCoders),
                     unmodifiableMap(ordinalToSideInput),
-                    ownerId
+                    ownerId,
+                    stepId
             );
         }
 
@@ -411,7 +418,8 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 Coder<InputT> inputValueCoder,
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
-                String ownerId
+                String ownerId,
+                String stepId
         );
 
         @Override

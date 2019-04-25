@@ -49,7 +49,8 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
             Coder<InputT> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
             Map<Integer, PCollectionView<?>> ordinalToSideInput,
-            String ownerId
+            String ownerId,
+            String stepId
     ) {
         super(
                 doFn,
@@ -63,7 +64,8 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 inputValueCoder,
                 outputValueCoders,
                 ordinalToSideInput,
-                ownerId
+                ownerId,
+                stepId
         );
     }
 
@@ -97,6 +99,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
     public static class Supplier<InputT, OutputT> extends AbstractSupplier<InputT, OutputT> {
 
         public Supplier(
+                String stepId,
                 String ownerId,
                 DoFn<InputT, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
@@ -111,6 +114,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 List<PCollectionView<?>> sideInputs
         ) {
             super(
+                    stepId,
                     ownerId,
                     doFn,
                     windowingStrategy,
@@ -139,7 +143,8 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 Coder<InputT> inputValueCoder,
                 Map<TupleTag<?>, Coder<?>> outputValueCoders,
                 Map<Integer, PCollectionView<?>> ordinalToSideInput,
-                String ownerId
+                String ownerId,
+                String stepId
         ) {
             return new ParDoP<>(
                     doFn,
@@ -153,7 +158,8 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                     inputValueCoder,
                     outputValueCoders,
                     ordinalToSideInput,
-                    ownerId
+                    ownerId,
+                    stepId
             );
         }
     }

@@ -35,10 +35,6 @@ import java.util.Map;
 
 public class JetMetricsContainer implements MetricsContainer {
 
-    public static String toStepName(String ownerId, int globalIndex) {
-        return ownerId + "/" + globalIndex;
-    }
-
     public static String ownerIdFromStepName(String stepName) {
         return stepName.substring(0, stepName.indexOf('/'));
     }
@@ -53,8 +49,8 @@ public class JetMetricsContainer implements MetricsContainer {
 
     private final IMapJet<String, MetricUpdates> accumulator;
 
-    public JetMetricsContainer(String ownerId, Processor.Context context) {
-        this.stepName = toStepName(ownerId, context.globalProcessorIndex());
+    public JetMetricsContainer(String stepName, Processor.Context context) {
+        this.stepName = stepName + "/" + context.globalProcessorIndex();
         this.accumulator = context.jetInstance().getMap(METRICS_ACCUMULATOR_NAME);
     }
 
@@ -74,20 +70,22 @@ public class JetMetricsContainer implements MetricsContainer {
     }
 
     public void flush() {
-        MetricUpdates updates = new MetricUpdatesImpl(
-                extractUpdates(counters), extractUpdates(distributions), extractUpdates(gauges)
-        );
+        ImmutableList<MetricUpdates.MetricUpdate<Long>> counters = extractUpdates(this.counters);
+        ImmutableList<MetricUpdates.MetricUpdate<DistributionData>> distributions = extractUpdates(this.distributions);
+        ImmutableList<MetricUpdates.MetricUpdate<GaugeData>> gauges = extractUpdates(this.gauges);
+        MetricUpdates updates = new MetricUpdatesImpl(counters, distributions, gauges);
         accumulator.put(stepName, updates);
     }
 
     private <UpdateT, CellT extends AbstractMetric<UpdateT>> ImmutableList<MetricUpdates.MetricUpdate<UpdateT>> extractUpdates(Map<MetricName, CellT> cells) {
         ImmutableList.Builder<MetricUpdates.MetricUpdate<UpdateT>> updates = ImmutableList.builder();
         for (CellT cell : cells.values()) {
-            MetricUpdates.MetricUpdate<UpdateT> update = MetricUpdates.MetricUpdate.create(
-                    MetricKey.create(stepName, cell.getName()),
-                    cell.getValue()
-            );
-            updates.add(update);
+            UpdateT value = cell.getValue();
+            if (value != null) {
+                MetricKey key = MetricKey.create(stepName, cell.getName());
+                MetricUpdates.MetricUpdate<UpdateT> update = MetricUpdates.MetricUpdate.create(key, value);
+                updates.add(update);
+            }
         }
         return updates.build();
     }

@@ -30,7 +30,7 @@ public class GaugeImpl extends AbstractMetric<GaugeData> implements Gauge {
 
     @Override
     GaugeData getValue() {
-        return null;
+        return gaugeData;
     }
 
     @Override

@@ -156,6 +156,7 @@ class JetTransformTranslators {
 
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
+            String stepId = transformName.contains("/") ? transformName.substring(0, transformName.indexOf('/')) : transformName;
             String vertexId = dagBuilder.newVertexId(transformName) + (usesStateOrTimers ? " - STATEFUL" : "");
             SerializablePipelineOptions pipelineOptions = context.getOptions();
             Coder inputValueCoder = ((PCollection) Utils.getInput(appliedTransform)).getCoder();
@@ -165,6 +166,7 @@ class JetTransformTranslators {
                     .collect(Collectors.toMap(si -> si, si -> Utils.getCoder(si.getPCollection())));
             SupplierEx<Processor> processorSupplier = usesStateOrTimers ?
                     new StatefulParDoP.Supplier(
+                            stepId,
                             vertexId,
                             doFn,
                             windowingStrategy,
@@ -179,6 +181,7 @@ class JetTransformTranslators {
                             sideInputs
                     ) :
                     new ParDoP.Supplier(
+                            stepId,
                             vertexId,
                             doFn,
                             windowingStrategy,
