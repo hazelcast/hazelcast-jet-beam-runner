@@ -237,7 +237,7 @@
                                 </goals>
                                 <configuration>
                                     <classpathScope>test</classpathScope>
-                                    <mainClass>com.hazelcast.jet.beam.nexmark.NexmarkRunner</mainClass>
+                                    <mainClass>org.apache.beam.sdk.nexmark.Main</mainClass>
                                     <arguments>
                                         <argument>--runner=JetRunner</argument>
                                         <argument>--streaming=false</argument>

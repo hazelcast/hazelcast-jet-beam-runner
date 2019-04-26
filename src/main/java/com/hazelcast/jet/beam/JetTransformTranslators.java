@@ -239,13 +239,13 @@ class JetTransformTranslators {
             WindowingStrategy<InputT, ? extends BoundedWindow> outputWindowingStrategy =
                     (WindowingStrategy<InputT, ? extends BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
             WindowingStrategy<?, ?> windowingStrategy = input.getWindowingStrategy();
-            Trigger trigger = outputWindowingStrategy.getTrigger();
+            /*Trigger trigger = outputWindowingStrategy.getTrigger();
             if (!trigger.isCompatible(DefaultTrigger.of()) && !trigger.isCompatible(Never.ever())) {
                 throw new UnsupportedOperationException("Only DefaultTrigger and Never.NeverTrigger supported, got " + trigger);
             }
             if (outputWindowingStrategy.getAllowedLateness().getMillis() != 0) {
                 throw new UnsupportedOperationException("Non-zero allowed lateness not supported");
-            }
+            }*/ //todo: this makes sense, but really doesn't help for now... we will need to implement triggers properly
 
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);

@@ -57,7 +57,23 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         this.jetClientSupplier = jetClientSupplier;
     }
 
+    @Override
     public PipelineResult run(Pipeline pipeline) {
+        Boolean startOwnCluster = options.getJetStartOwnCluster();
+        if (startOwnCluster) {
+            JetInstance jet1 = Jet.newJetInstance();
+            JetInstance jet2 = Jet.newJetInstance();
+        }
+        try {
+            return runInternal(pipeline);
+        } finally {
+            if (startOwnCluster) {
+                Jet.shutdownAll();
+            }
+        }
+    }
+
+    private PipelineResult runInternal(Pipeline pipeline) {
         try {
             normalize(pipeline);
             DAG dag = translate(pipeline);

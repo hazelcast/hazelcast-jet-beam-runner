@@ -180,9 +180,6 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     @Override
     public void close() {
         doFnInvoker.invokeTeardown();
-
-        metricsContainer.flush();
-        MetricsEnvironment.setCurrentContainer(null);  //todo: this is correct only as long as the processor is non-cooperative
     }
 
     @Override
@@ -277,7 +274,12 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     public boolean complete() {
         //System.out.println(ParDoP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
-        return outputManager.tryFlush();
+        boolean successful = outputManager.tryFlush();
+        if (successful) {
+            metricsContainer.flush();
+            MetricsEnvironment.setCurrentContainer(null);  //todo: this is correct only as long as the processor is non-cooperative
+        }
+        return successful;
     }
 
     /**
