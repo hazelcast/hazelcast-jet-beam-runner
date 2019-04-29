@@ -27,6 +27,7 @@ import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.transforms.DoFnSchemaInformation;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
@@ -35,11 +36,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { //todo: unify with StatefulParDoP?
+/**
+ * Jet {@link com.hazelcast.jet.core.Processor} implementation for Beam's ParDo primitive (when no
+ * user-state is being used).
+ */
+public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { // todo: unify with StatefulParDoP?
 
     private ParDoP(
             DoFn<InputT, OutputT> doFn,
             WindowingStrategy<?, ?> windowingStrategy,
+            DoFnSchemaInformation doFnSchemaInformation,
             Map<TupleTag<?>, int[]> outputCollToOrdinals,
             SerializablePipelineOptions pipelineOptions,
             TupleTag<OutputT> mainOutputTag,
@@ -55,6 +61,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
         super(
                 doFn,
                 windowingStrategy,
+                doFnSchemaInformation,
                 outputCollToOrdinals,
                 pipelineOptions,
                 mainOutputTag,
@@ -75,10 +82,12 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
             DoFn<InputT, OutputT> doFn,
             SideInputReader sideInputReader,
             JetOutputManager outputManager,
-            TupleTag<OutputT> mainOutputTag, List<TupleTag<?>> additionalOutputTags,
+            TupleTag<OutputT> mainOutputTag,
+            List<TupleTag<?>> additionalOutputTags,
             Coder<InputT> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
-            WindowingStrategy<?, ?> windowingStrategy
+            WindowingStrategy<?, ?> windowingStrategy,
+            DoFnSchemaInformation doFnSchemaInformation
     ) {
         return DoFnRunners.simpleRunner(
                 pipelineOptions,
@@ -90,12 +99,17 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 new NotImplementedStepContext(),
                 inputValueCoder,
                 outputValueCoders,
-                windowingStrategy
-        );
+                windowingStrategy,
+                doFnSchemaInformation);
         //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
         //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
+    /**
+     * Jet {@link Processor} supplier that will provide instances of {@link ParDoP}.
+     *
+     * @param <OutputT> the type of main output elements of the DoFn being used
+     */
     public static class Supplier<InputT, OutputT> extends AbstractSupplier<InputT, OutputT> {
 
         public Supplier(
@@ -103,6 +117,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                 String ownerId,
                 DoFn<InputT, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
+                DoFnSchemaInformation doFnSchemaInformation,
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
                 Set<TupleTag<OutputT>> allOutputTags,
@@ -118,6 +133,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
                     ownerId,
                     doFn,
                     windowingStrategy,
+                    doFnSchemaInformation,
                     pipelineOptions,
                     mainOutputTag,
                     allOutputTags,
@@ -134,6 +150,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
         Processor getEx(
                 DoFn<InputT, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
+                DoFnSchemaInformation doFnSchemaInformation,
                 Map<TupleTag<?>, int[]> outputCollToOrdinals,
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
@@ -149,6 +166,7 @@ public class ParDoP<InputT, OutputT> extends AbstractParDoP<InputT, OutputT> { /
             return new ParDoP<>(
                     doFn,
                     windowingStrategy,
+                    doFnSchemaInformation,
                     outputCollToOrdinals,
                     pipelineOptions,
                     mainOutputTag,

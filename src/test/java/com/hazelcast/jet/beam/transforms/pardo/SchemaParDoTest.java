@@ -26,6 +26,7 @@ import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.Filter;
 import org.apache.beam.sdk.transforms.ParDo;
+import org.apache.beam.sdk.transforms.ParDoSchemaTest;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionTuple;
 import org.apache.beam.sdk.values.Row;
@@ -291,7 +292,7 @@ public class SchemaParDoTest extends AbstractParDoTest {
                                                     FieldAccessDescriptor.withAllFields();
 
                                             @ProcessElement
-                                            public void process(@FieldAccess("foo") Row row, OutputReceiver<String> r) {
+                                            public void process(@FieldAccess("foo") @Element Row row, OutputReceiver<String> r) {
                                                 r.output(row.getString(0) + ":" + row.getInt32(1));
                                             }
                                         }));

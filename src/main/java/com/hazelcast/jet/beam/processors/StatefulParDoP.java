@@ -32,6 +32,7 @@ import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.transforms.DoFnSchemaInformation;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
@@ -46,7 +47,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> { //todo: unify with ParDoP?
+/**
+ * Jet {@link com.hazelcast.jet.core.Processor} implementation for Beam's stateful ParDo primitive.
+ */
+public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> { // todo: unify with ParDoP?
 
     private KeyedStepContext keyedStepContext;
     private InMemoryTimerInternals timerInternals;
@@ -54,6 +58,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
     private StatefulParDoP(
             DoFn<KV<?, ?>, OutputT> doFn,
             WindowingStrategy<?, ?> windowingStrategy,
+            DoFnSchemaInformation doFnSchemaInformation,
             Map<TupleTag<?>, int[]> outputCollToOrdinals,
             SerializablePipelineOptions pipelineOptions,
             TupleTag<OutputT> mainOutputTag,
@@ -69,6 +74,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
         super(
                 doFn,
                 windowingStrategy,
+                doFnSchemaInformation,
                 outputCollToOrdinals,
                 pipelineOptions,
                 mainOutputTag,
@@ -93,7 +99,8 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
             List<TupleTag<?>> additionalOutputTags,
             Coder<KV<?, ?>> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
-            WindowingStrategy<?, ?> windowingStrategy
+            WindowingStrategy<?, ?> windowingStrategy,
+            DoFnSchemaInformation doFnSchemaInformation
     ) {
         timerInternals = new InMemoryTimerInternals();
         keyedStepContext = new KeyedStepContext(timerInternals);
@@ -107,7 +114,8 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 keyedStepContext,
                 inputValueCoder,
                 outputValueCoders,
-                windowingStrategy
+                windowingStrategy,
+                doFnSchemaInformation
         );
         //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
         //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
@@ -182,7 +190,9 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 fireTimer(timer, doFnRunner);
             }
 
-            if (!hasFired) break;
+            if (!hasFired) {
+                break;
+            }
         }
     }
 
@@ -192,6 +202,11 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
         doFnRunner.onTimer(timer.getTimerId(), window, timer.getTimestamp(), timer.getDomain());
     }
 
+    /**
+     * Jet {@link Processor} supplier that will provide instances of {@link StatefulParDoP}.
+     *
+     * @param <OutputT> the type of main output elements of the DoFn being used
+     */
     public static class Supplier<OutputT> extends AbstractSupplier<KV<?, ?>, OutputT> {
 
         public Supplier(
@@ -199,6 +214,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                 String ownerId,
                 DoFn<KV<?, ?>, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
+                DoFnSchemaInformation doFnSchemaInformation,
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
                 Set<TupleTag<OutputT>> allOutputTags,
@@ -214,6 +230,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
                     ownerId,
                     doFn,
                     windowingStrategy,
+                    doFnSchemaInformation,
                     pipelineOptions,
                     mainOutputTag,
                     allOutputTags,
@@ -230,6 +247,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
         Processor getEx(
                 DoFn<KV<?, ?>, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
+                DoFnSchemaInformation doFnSchemaInformation,
                 Map<TupleTag<?>, int[]> outputCollToOrdinals,
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
@@ -245,6 +263,7 @@ public class StatefulParDoP<OutputT> extends AbstractParDoP<KV<?, ?>, OutputT> {
             return new StatefulParDoP<>(
                     doFn,
                     windowingStrategy,
+                    doFnSchemaInformation,
                     outputCollToOrdinals,
                     pipelineOptions,
                     mainOutputTag,

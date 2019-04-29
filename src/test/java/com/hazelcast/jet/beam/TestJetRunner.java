@@ -27,28 +27,30 @@ import org.apache.beam.sdk.options.PipelineOptions;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 
 public class TestJetRunner extends PipelineRunner<PipelineResult> {
 
-    private final JetTestInstanceFactory factory = new JetTestInstanceFactory();
+    public static JetTestInstanceFactory EXTERNAL_FACTORY;
 
-    public static TestJetRunner fromOptions(PipelineOptions options) {
-        return new TestJetRunner(options);
-    }
-
+    private final JetTestInstanceFactory factory;
     private final JetRunner delegate;
 
     private TestJetRunner(PipelineOptions options) {
         JetPipelineOptions jetPipelineOptions = options.as(JetPipelineOptions.class);
         jetPipelineOptions.setJetStartOwnCluster(false);
 
-        this.delegate = JetRunner.fromOptions(options, factory::newClient);
+        this.factory = EXTERNAL_FACTORY == null ? new JetTestInstanceFactory() : null;
+        this.delegate = JetRunner.fromOptions(options, (EXTERNAL_FACTORY == null ? factory : EXTERNAL_FACTORY)::newClient);
+    }
+
+    public static TestJetRunner fromOptions(PipelineOptions options) {
+        return new TestJetRunner(options);
     }
 
     @Override
     public PipelineResult run(Pipeline pipeline) {
-        Collection<JetInstance> instances = initInstances(factory);
-        System.out.println("Created " + instances.size() + " instances.");
+        Collection<JetInstance> instances = initMemberInstances(EXTERNAL_FACTORY, factory);
         try {
             PipelineResult result = delegate.run(pipeline);
             if (result instanceof FailedRunningPipelineResults) {
@@ -57,19 +59,30 @@ public class TestJetRunner extends PipelineRunner<PipelineResult> {
             }
             return result;
         } finally {
-            System.out.println("Shutting down " + instances.size() + " instances...");
-            factory.shutdownAll();
+            killMemberInstances(instances, factory);
         }
     }
 
-    private Collection<JetInstance> initInstances(JetTestInstanceFactory factory) {
+    private static Collection<JetInstance> initMemberInstances(JetTestInstanceFactory externalFactory, JetTestInstanceFactory internalFactory) {
+        if (externalFactory != null) {
+            //no need to create own member instances
+            return Collections.emptyList();
+        }
+
         JetConfig config = new JetConfig();
         config.getHazelcastConfig().addEventJournalConfig(new EventJournalConfig().setMapName("map"));
 
-        return  Arrays.asList(
-                factory.newMember(config),
-                factory.newMember(config)
+        return Arrays.asList(
+                internalFactory.newMember(config),
+                internalFactory.newMember(config)
         );
+    }
+
+    private static void killMemberInstances(Collection<JetInstance> instances, JetTestInstanceFactory internalFactory) {
+        if (!instances.isEmpty()) {
+            //there are own member instances to kill
+            internalFactory.shutdownAll();
+        }
     }
 
 }

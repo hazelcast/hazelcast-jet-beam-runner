@@ -36,6 +36,7 @@ import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.metrics.MetricsEnvironment;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.transforms.DoFnSchemaInformation;
 import org.apache.beam.sdk.transforms.reflect.DoFnInvoker;
 import org.apache.beam.sdk.transforms.reflect.DoFnInvokers;
 import org.apache.beam.sdk.util.WindowedValue;
@@ -50,6 +51,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,15 +62,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.hazelcast.jet.beam.Utils.serde;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.unmodifiableMap;
-
 abstract class AbstractParDoP<InputT, OutputT> implements Processor {
 
     private final SerializablePipelineOptions pipelineOptions;
     private final DoFn<InputT, OutputT> doFn;
     private final WindowingStrategy<?, ?> windowingStrategy;
+    private final DoFnSchemaInformation doFnSchemaInformation;
     private final Map<TupleTag<?>, int[]> outputCollToOrdinals;
     private final TupleTag<OutputT> mainOutputTag;
     private final Coder<InputT> inputCoder;
@@ -94,6 +93,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     AbstractParDoP(
             DoFn<InputT, OutputT> doFn,
             WindowingStrategy<?, ?> windowingStrategy,
+            DoFnSchemaInformation doFnSchemaInformation,
             Map<TupleTag<?>, int[]> outputCollToOrdinals,
             SerializablePipelineOptions pipelineOptions,
             TupleTag<OutputT> mainOutputTag,
@@ -107,8 +107,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             String stepId
     ) {
         this.pipelineOptions = pipelineOptions;
-        this.doFn = serde(doFn);
+        this.doFn = Utils.serde(doFn);
         this.windowingStrategy = windowingStrategy;
+        this.doFnSchemaInformation = doFnSchemaInformation;
         this.outputCollToOrdinals = outputCollToOrdinals;
         this.mainOutputTag = mainOutputTag;
         this.inputCoder = inputCoder;
@@ -137,7 +138,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         doFnInvoker.invokeSetup();
 
         if (ordinalToSideInput.isEmpty()) {
-            sideInputReader = NullSideInputReader.of(emptyList());
+            sideInputReader = NullSideInputReader.of(Collections.emptyList());
         } else {
             bufferedItems = new SimpleInbox();
             sideInputHandler = new SideInputHandler(ordinalToSideInput.values(), InMemoryStateInternals.forKey(null));
@@ -155,7 +156,8 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 Lists.newArrayList(outputCollToOrdinals.keySet()),
                 inputValueCoder,
                 outputValueCoders,
-                windowingStrategy
+                windowingStrategy,
+                doFnSchemaInformation
         );
     }
 
@@ -168,9 +170,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             List<TupleTag<?>> additionalOutputTags,
             Coder<InputT> inputValueCoder,
             Map<TupleTag<?>, Coder<?>> outputValueCoders,
-            WindowingStrategy<?, ?> windowingStrategy
+            WindowingStrategy<?, ?> windowingStrategy,
+            DoFnSchemaInformation doFnSchemaInformation
     );
-
 
     @Override
     public boolean isCooperative() {
@@ -235,7 +237,6 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         runner.finishBundle();
     }
 
-    @SuppressWarnings("unchecked")
     private void processBufferedRegularItems(Inbox inbox) {
         for (byte[] value; (value = (byte[]) inbox.poll()) != null; ) {
             bufferedItems.add(value);
@@ -347,6 +348,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         private final SerializablePipelineOptions pipelineOptions;
         private final DoFn<InputT, OutputT> doFn;
         private final WindowingStrategy<?, ?> windowingStrategy;
+        private final DoFnSchemaInformation doFnSchemaInformation;
         private final TupleTag<OutputT> mainOutputTag;
         private final Map<TupleTag<?>, List<Integer>> outputCollToOrdinals;
         private final Coder<InputT> inputCoder;
@@ -363,6 +365,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
                 String ownerId,
                 DoFn<InputT, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
+                DoFnSchemaInformation doFnSchemaInformation,
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
                 Set<TupleTag<OutputT>> allOutputTags,
@@ -378,6 +381,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
             this.pipelineOptions = pipelineOptions;
             this.doFn = doFn;
             this.windowingStrategy = windowingStrategy;
+            this.doFnSchemaInformation = doFnSchemaInformation;
             this.outputCollToOrdinals = allOutputTags.stream().collect(Collectors.toMap(Function.identity(), t -> new ArrayList<>()));
             this.mainOutputTag = mainOutputTag;
             this.inputCoder = inputCoder;
@@ -390,19 +394,22 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
 
         @Override
         public Processor getEx() {
-            if (ordinalToSideInput.size() != sideInputs.size()) throw new RuntimeException("Oops");
+            if (ordinalToSideInput.size() != sideInputs.size()) {
+                throw new RuntimeException("Oops");
+            }
             return getEx(
                     doFn,
                     windowingStrategy,
+                    doFnSchemaInformation,
                     outputCollToOrdinals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().stream().mapToInt(i -> i).toArray())),
                     pipelineOptions,
                     mainOutputTag,
                     inputCoder,
-                    unmodifiableMap(sideInputCoders),
-                    unmodifiableMap(outputCoders),
+                    Collections.unmodifiableMap(sideInputCoders),
+                    Collections.unmodifiableMap(outputCoders),
                     inputValueCoder,
-                    unmodifiableMap(outputValueCoders),
-                    unmodifiableMap(ordinalToSideInput),
+                    Collections.unmodifiableMap(outputValueCoders),
+                    Collections.unmodifiableMap(ordinalToSideInput),
                     ownerId,
                     stepId
             );
@@ -411,6 +418,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         abstract Processor getEx(
                 DoFn<InputT, OutputT> doFn,
                 WindowingStrategy<?, ?> windowingStrategy,
+                DoFnSchemaInformation doFnSchemaInformation,
                 Map<TupleTag<?>, int[]> outputCollToOrdinals,
                 SerializablePipelineOptions pipelineOptions,
                 TupleTag<OutputT> mainOutputTag,
@@ -428,7 +436,9 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         public void isOutboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId) {
             if (ownerId.equals(vertexId)) {
                 List<Integer> ordinals = outputCollToOrdinals.get(new TupleTag<>(pCollId));
-                if (ordinals == null) throw new RuntimeException("Oops"); //todo
+                if (ordinals == null) {
+                    throw new RuntimeException("Oops"); // todo
+                }
 
                 ordinals.add(edge.getSourceOrdinal());
             }
@@ -447,7 +457,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         }
     }
 
-    private class SimpleInbox implements Inbox {
+    private static class SimpleInbox implements Inbox {
         private Deque<Object> items = new ArrayDeque<>();
 
         public void add(Object item) {

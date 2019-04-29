@@ -17,15 +17,17 @@
 package com.hazelcast.jet.beam.metrics;
 
 import com.hazelcast.core.EntryEvent;
+import com.hazelcast.core.MapEvent;
 import com.hazelcast.map.listener.EntryAddedListener;
-import org.apache.beam.runners.core.construction.metrics.MetricFiltering;
-import org.apache.beam.runners.core.construction.metrics.MetricKey;
+import com.hazelcast.map.listener.MapClearedListener;
 import org.apache.beam.runners.core.metrics.DistributionData;
 import org.apache.beam.runners.core.metrics.GaugeData;
 import org.apache.beam.runners.core.metrics.MetricUpdates;
 import org.apache.beam.runners.core.metrics.MetricUpdates.MetricUpdate;
 import org.apache.beam.sdk.metrics.DistributionResult;
 import org.apache.beam.sdk.metrics.GaugeResult;
+import org.apache.beam.sdk.metrics.MetricFiltering;
+import org.apache.beam.sdk.metrics.MetricKey;
 import org.apache.beam.sdk.metrics.MetricQueryResults;
 import org.apache.beam.sdk.metrics.MetricResult;
 import org.apache.beam.sdk.metrics.MetricResults;
@@ -37,7 +39,7 @@ import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 
-public class JetMetricResults extends MetricResults implements EntryAddedListener<String, MetricUpdates> {
+public class JetMetricResults extends MetricResults implements EntryAddedListener<String, MetricUpdates>, MapClearedListener {
 
     private final Map<MetricKey, Long> counters = new HashMap<>();
     private final Map<MetricKey, DistributionData> distributions = new HashMap<>();
@@ -46,6 +48,13 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
     @Override
     public void entryAdded(EntryEvent<String, MetricUpdates> event) {
         merge(event.getValue());
+    }
+
+    @Override
+    public void mapCleared(MapEvent mapEvent) {
+        counters.clear();
+        distributions.clear();
+        gauges.clear();
     }
 
     private void merge(MetricUpdates metricUpdates) {
@@ -111,7 +120,7 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
         private MetricResult<Long> counterUpdateToResult(Map.Entry<MetricKey, Long> entry) {
             MetricKey key = entry.getKey();
             Long counter = entry.getValue();
-            return MetricResult.create(key.metricName(), key.stepName(), counter, counter);
+            return MetricResult.create(key, counter, counter);
         }
 
         @Override
@@ -125,7 +134,7 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
         private MetricResult<DistributionResult> distributionUpdateToResult(Map.Entry<MetricKey, DistributionData> entry) {
             MetricKey key = entry.getKey();
             DistributionResult distributionResult = entry.getValue().extractResult();
-            return MetricResult.create(key.metricName(), key.stepName(), distributionResult, distributionResult);
+            return MetricResult.create(key, distributionResult, distributionResult);
         }
 
         @Override
@@ -139,7 +148,7 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
         private MetricResult<GaugeResult> gaugeUpdateToResult(Map.Entry<MetricKey, GaugeData> entry) {
             MetricKey key = entry.getKey();
             GaugeResult gaugeResult = entry.getValue().extractResult();
-            return MetricResult.create(key.metricName(), key.stepName(), gaugeResult, gaugeResult);
+            return MetricResult.create(key, gaugeResult, gaugeResult);
         }
 
         private Predicate<Map.Entry<MetricKey, ?>> matchesFilter(final MetricsFilter filter) {

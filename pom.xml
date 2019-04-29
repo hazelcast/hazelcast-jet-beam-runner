@@ -35,9 +35,9 @@
             -Dhazelcast.test.use.network=false
             -Djava.net.preferIPv4Stack=true
         </surefire.argLine>
-        <hazelcast.jet.version>3.1-SNAPSHOT</hazelcast.jet.version>
+        <hazelcast.jet.version>3.0</hazelcast.jet.version>
         <hazelcast.imdg.version>3.12</hazelcast.imdg.version>
-        <apache.beam.version>2.11.0</apache.beam.version>
+        <apache.beam.version>2.12.0</apache.beam.version>
         <maven.surefire.plugin.version>3.0.0-M3</maven.surefire.plugin.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>

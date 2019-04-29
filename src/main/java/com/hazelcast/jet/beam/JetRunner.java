@@ -37,6 +37,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
+import static com.hazelcast.jet.beam.metrics.JetMetricsContainer.METRICS_ACCUMULATOR_NAME;
+
 public class JetRunner extends PipelineRunner<PipelineResult> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JetRunner.class);
@@ -108,8 +110,9 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
 
     private JetPipelineResult run(DAG dag) {
         JetInstance jet = getJetInstance(options);
+        jet.getMap(METRICS_ACCUMULATOR_NAME).clear(); //clear metrics map
 
-        IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(JetMetricsContainer.METRICS_ACCUMULATOR_NAME);
+        IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(METRICS_ACCUMULATOR_NAME);
         Job job = jet.newJob(dag);
 
         JetPipelineResult result = new JetPipelineResult(metricsAccumulator);

@@ -18,13 +18,13 @@ package com.hazelcast.jet.beam.metrics;
 
 import com.hazelcast.jet.IMapJet;
 import com.hazelcast.jet.core.Processor;
-import org.apache.beam.runners.core.construction.metrics.MetricKey;
 import org.apache.beam.runners.core.metrics.DistributionData;
 import org.apache.beam.runners.core.metrics.GaugeData;
 import org.apache.beam.runners.core.metrics.MetricUpdates;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Distribution;
 import org.apache.beam.sdk.metrics.Gauge;
+import org.apache.beam.sdk.metrics.MetricKey;
 import org.apache.beam.sdk.metrics.MetricName;
 import org.apache.beam.sdk.metrics.MetricsContainer;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.ImmutableList;
@@ -96,7 +96,7 @@ public class JetMetricsContainer implements MetricsContainer {
         private final Iterable<MetricUpdate<DistributionData>> distributions;
         private final Iterable<MetricUpdate<GaugeData>> gauges;
 
-        public MetricUpdatesImpl(Iterable<MetricUpdate<Long>> counters, Iterable<MetricUpdate<DistributionData>> distributions, Iterable<MetricUpdate<GaugeData>> gauges) {
+        MetricUpdatesImpl(Iterable<MetricUpdate<Long>> counters, Iterable<MetricUpdate<DistributionData>> distributions, Iterable<MetricUpdate<GaugeData>> gauges) {
             this.counters = counters;
             this.distributions = distributions;
             this.gauges = gauges;

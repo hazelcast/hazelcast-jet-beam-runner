@@ -41,11 +41,9 @@ import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy.Node;
 import org.apache.beam.sdk.testing.TestStream;
 import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.transforms.DoFnSchemaInformation;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
-import org.apache.beam.sdk.transforms.windowing.DefaultTrigger;
-import org.apache.beam.sdk.transforms.windowing.Never;
-import org.apache.beam.sdk.transforms.windowing.Trigger;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PBegin;
@@ -98,7 +96,6 @@ class JetTransformTranslators {
                 throw new UnsupportedOperationException(); //todo
             }
 
-            @SuppressWarnings("unchecked")
             BoundedSource<T> source;
             try {
                 source = ReadTranslation.boundedSourceFromTransform(appliedTransform);
@@ -164,12 +161,14 @@ class JetTransformTranslators {
             List<PCollectionView<?>> sideInputs = Utils.getSideInputs(appliedTransform);
             Map<? extends PCollectionView<?>, Coder> sideInputCoders = sideInputs.stream()
                     .collect(Collectors.toMap(si -> si, si -> Utils.getCoder(si.getPCollection())));
+            DoFnSchemaInformation doFnSchemaInformation = ParDoTranslation.getSchemaInformation(appliedTransform);
             SupplierEx<Processor> processorSupplier = usesStateOrTimers ?
                     new StatefulParDoP.Supplier(
                             stepId,
                             vertexId,
                             doFn,
                             windowingStrategy,
+                            doFnSchemaInformation,
                             pipelineOptions,
                             mainOutputTag,
                             outputMap.keySet(),
@@ -185,6 +184,7 @@ class JetTransformTranslators {
                             vertexId,
                             doFn,
                             windowingStrategy,
+                            doFnSchemaInformation,
                             pipelineOptions,
                             mainOutputTag,
                             outputMap.keySet(),
@@ -200,7 +200,9 @@ class JetTransformTranslators {
             dagBuilder.registerConstructionListeners((DAGBuilder.WiringListener) processorSupplier);
 
             Collection<PValue> mainInputs = Utils.getMainInputs(pipeline, node);
-            if (mainInputs.size() != 1) throw new RuntimeException("Oops!");
+            if (mainInputs.size() != 1) {
+                throw new RuntimeException("Oops!");
+            }
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(mainInputs.iterator().next()), vertex);
 
             Map<TupleTag<?>, PValue> additionalInputs = Utils.getAdditionalInputs(node);
@@ -234,10 +236,7 @@ class JetTransformTranslators {
             Coder inputCoder = Utils.getCoder(input);
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
-            assert input != null : "null input";
 
-            WindowingStrategy<InputT, ? extends BoundedWindow> outputWindowingStrategy =
-                    (WindowingStrategy<InputT, ? extends BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
             WindowingStrategy<?, ?> windowingStrategy = input.getWindowingStrategy();
             /*Trigger trigger = outputWindowingStrategy.getTrigger();
             if (!trigger.isCompatible(DefaultTrigger.of()) && !trigger.isCompatible(Never.ever())) {

@@ -47,7 +47,8 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
     @Rule
     public transient TestPipeline pipeline = getTestPipeline();
 
-    @Rule public transient ExpectedException thrown = ExpectedException.none();
+    @Rule
+    public transient ExpectedException thrown = ExpectedException.none();
 
     private static TestPipeline getTestPipeline() {
         PipelineOptions options = PipelineOptionsFactory.create();
@@ -58,9 +59,27 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
         return TestPipeline.fromOptions(options);
     }
 
+    private static JetTestInstanceFactory factory = new JetTestInstanceFactory();
+
+    static {
+        TestJetRunner.EXTERNAL_FACTORY = factory;
+    }
+
+    private static JetInstance instance1, instance2;
+
     @BeforeClass
     public static void beforeClass() {
+        JetConfig config = new JetConfig();
+        config.getHazelcastConfig().addEventJournalConfig(new EventJournalConfig().setMapName("map"));
+        instance1 = factory.newMember(config);
+        instance2 = factory.newMember(config);
+
         printEnv();
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        factory.shutdownAll();
     }
 
     private static void printEnv() {
@@ -90,13 +109,13 @@ public abstract class AbstractTransformTest implements Serializable { //has to b
         final Matcher<? super K> keyMatcher;
         final Matcher<? super V> valueMatcher;
 
-        public static <K, V> KvMatcher<K, V> isKv(Matcher<K> keyMatcher, Matcher<V> valueMatcher) {
-            return new KvMatcher<>(keyMatcher, valueMatcher);
-        }
-
         public KvMatcher(Matcher<? super K> keyMatcher, Matcher<? super V> valueMatcher) {
             this.keyMatcher = keyMatcher;
             this.valueMatcher = valueMatcher;
+        }
+
+        public static <K, V> KvMatcher<K, V> isKv(Matcher<K> keyMatcher, Matcher<V> valueMatcher) {
+            return new KvMatcher<>(keyMatcher, valueMatcher);
         }
 
         @Override
