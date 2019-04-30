@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Beam vs. Jet, Capabilities</title>
+    <style>
+        ul li { margin-bottom: 10px; }
+    </style>
+</head>
+
+<a name="top"></a>
+
+<div id="toc_container">
+    <p class="toc_title">Contents</p>
+    <ul class="toc_list">
+        <li><a href="#what">What is being computed?</a></li>
+        <li><a href="#where">Where in event time?</a></li>
+        <li><a href="#when">When in processing time?</a></li>
+        <li><a href="#how">How do refinements relate?</a></li>
+    </ul>
+</div>
+
+<h1 id="what" style="color:#ca1;">What is being computed?</h1>
+<ul style="list-style: none;">
+    <li> <b><span style="color:#ca1;">&#x2713; ParDo</span></b>:
+        Element-wise transformation parameterized by a chunk of user code. Elements are processed in bundles, with
+        initialization and termination hooks. Bundle size is chosen by the runner and cannot be controlled by user code.
+        ParDo processes a main input PCollection one element at a time, but provides side input access to additional PCollections.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#ca1;">&#x7E; GroupByKey</span></b>:
+        Grouping of key-value pairs per key, window, and pane. Uses the Beam code for grouping by window.
+        <span style="color:red">Fully supported AFTER we add Trigger handling (1 day).</span>
+    </li>
+    <li> <li> <b><span style="color:#ca1;">&#x2713; Flatten</span></b>:
+        Concatenates multiple homogenously typed collections together.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#ca1;">&#x2713; Combine</span></b>:
+        Application of an associative, commutative operation over all values ("globally") or over all values associated
+        with each key ("per key"). Can be implemented using ParDo, but often more efficient implementations exist.
+        Fully supported but inefficient, uses default Beam translation.
+    </li>
+    <li> <b><span style="color:#ca1;">&#x7E; Composite Transforms</span></b>:
+        Allows easy extensibility for library writers. In the near future, we expect there to be more information
+        provided at this level -- customized metadata hooks for monitoring, additional runtime/environment hooks, etc.
+        Partially supported via inlining
+    </li>
+    <li> <b><span style="color:#ca1;">&#x7E; Side Inputs</span></b>:
+        Side inputs are additional PCollections whose contents are computed during pipeline execution and then made accessible to DoFn code.
+        The exact shape of the side input depends both on the PCollectionView used to describe the access pattern
+        (interable, map, singleton) and the window of the element from the main input that is currently being processed.
+        <span style="color:red;">Supported when the side input source is bounded, other scenarios should be review-ed (1/2 day).</span>
+    </li>
+    <li> <b><span style="color:#ca1;">&#x2713; Source API</span></b>:
+        Allows users to provide additional input sources. Supports both bounded and unbounded data. Includes hooks
+        necessary to provide efficient parallelization (size estimation, progress information, dynamic splitting, etc).
+        <span style="color:red;">Partially supported, bounded sources only. We could/should implement unbounded ones (2 days).</span>
+    </li>
+    <li> <b><span style="color:#ca1;">&#x2715; Splittable DoFn (SDF)</span></b>:
+        Allows users to develop DoFn's that process a single element in portions ("restrictions"), executed in parallel or
+        sequentially. This supersedes the unbounded and bounded `Source` APIs by supporting all of their features on a
+        per-element basis. See http://s.apache.org/splittable-do-fn. Design is in progress on achieving parity with
+        Source API regarding progress signals. Not implemented, not planning on doing it either.
+    </li>
+    <li> <b><span style="color:#ca1;">&#x7E; Metrics</span></b>:
+        Allow transforms to gather simple metrics across bundles in a PTransform. Provide a mechanism to obtain both
+        committed and attempted metrics. Semantically similar to using an additional output, but support partial results
+        as the transform executes, and support both committed and attempted values. Will likely want to augment Metrics
+        to be more useful for processing unbounded data by making them windowed. Supported to a degree required for running
+        Nexmark tests; doesn't differentiate between committed and attempted metrics
+    </li>
+    <li> <b><span style="color:#ca1;">&#x7E; Stateful Processing</span></b>:
+        Allows fine-grained access to per-key, per-window persistent state. Necessary for certain use cases (e.g.
+        high-volume windows which store large amounts of data, but typically only access small portions of it;
+        complex state machines; etc.) that are not easily or efficiently addressed via Combine or GroupByKey+ParDo.
+        <span style="color:red;">Supported, but not sure about its limitations, needs some looking into (1/2 day).</span>
+    </li>
+</ul>
+<p align="right"><a href="#top">Back to top</a></p>
+
+<h1 id="where" style="color:#37d;">Where in event time?</h1>
+<ul style="list-style: none;">
+    <li> <b><span style="color:#37d;">&#x2713; Global windows</span></b>:
+        The default window which covers all of time. (Basically how traditional batch cases fit in the model.)
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#37d;">&#x2713; Fixed windows</span></b>:
+        Fixed-size, timestamp-based windows. (Hourly, Daily, etc)
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#37d;">&#x2713; Sliding windows</span></b>:
+        Possibly overlapping fixed-size timestamp-based windows (Every minute, use the last ten minutes of data.)
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#37d;">&#x2713; Session windows</span></b>:
+        Based on bursts of activity separated by a gap size. Different per key.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#37d;">&#x2713; Custom windows</span></b>:
+        All windows must implement BoundedWindow, which specifies a max timestamp. Each WindowFn assigns elements to an associated window.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#37d;">&#x2713; Custom merging windows</span></b>:
+        A custom WindowFn additionally specifies whether and how to merge windows.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#37d;">&#x2713; Timestamp control</span></b>:
+        For a grouping transform, such as GBK or Combine, an OutputTimeFn specifies (1) how to combine input timestamps
+        within a window and (2) how to merge aggregated timestamps when windows merge.
+        Fully supported.
+    </li>
+</ul>
+<p align="right"><a href="#top">Back to top</a></p>
+
+<h1 id="when" style="color:#6a4;">When in processing time?</h1>
+<span style="color:red;">To be reviewed after triggers have been added!</span>
+<p align="right"><a href="#top">Back to top</a></p>
+
+<h1 id="how" style="color:#b55;">How do refinements relate?</h1>
+<span style="color:red;">To be reviewed after triggers have been added!</span>
+<p align="right"><a href="#top">Back to top</a></p>
+
+</body>
+</html>
+
