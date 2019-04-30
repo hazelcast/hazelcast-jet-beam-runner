@@ -122,7 +122,6 @@ public class BasicCombineTest extends AbstractCombineTest {
     }
 
     @Test
-    @Ignore // triggers not supported
     public void testHotKeyCombiningWithAccumulationMode() {
         PCollection<Integer> input = pipeline.apply(Create.of(1, 2, 3, 4, 5));
 

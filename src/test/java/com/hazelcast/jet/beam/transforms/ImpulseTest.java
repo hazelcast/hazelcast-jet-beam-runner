@@ -33,7 +33,7 @@ import static junit.framework.TestCase.assertEquals;
 public class ImpulseTest extends AbstractTransformTest {
 
     @Test
-    @Ignore //todo: this test fail when there is parallelism, because the data is emitted multiple times...
+    @Ignore //this test fail when there is parallelism, because the data is emitted multiple times...
     public void testImpulse() {
         PCollection<Integer> result =
                 pipeline.apply(Impulse.create())

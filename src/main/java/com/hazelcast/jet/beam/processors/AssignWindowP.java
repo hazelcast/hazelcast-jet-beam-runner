@@ -20,6 +20,7 @@ import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ResettableSingletonTraverser;
+import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
@@ -72,6 +73,12 @@ public class AssignWindowP<InputT> extends AbstractProcessor {
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
         return flatMapper.tryProcess((byte[]) item);
+    }
+
+    @Override
+    public boolean tryProcessWatermark(@Nonnull Watermark watermark) {
+        //System.err.println(ownerId + "/" + System.identityHashCode(this) + ": watermark = " + watermark + ", on thread: " + Thread.currentThread());
+        return super.tryProcessWatermark(watermark);
     }
 
     public static <InputT> SupplierEx<Processor> supplier(

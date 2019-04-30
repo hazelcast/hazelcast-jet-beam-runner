@@ -126,6 +126,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         this.ordinalToSideInput = ordinalToSideInput;
         this.ownerId = ownerId;
         this.stepId = stepId;
+        //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
@@ -224,12 +225,10 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     }
 
     protected void startRunnerBundle(DoFnRunner<InputT, OutputT> runner) {
-        //System.out.println(AbstractParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId); //useful for debugging
         runner.startBundle();
     }
 
     protected void processElementWithRunner(DoFnRunner<InputT, OutputT> runner, WindowedValue<InputT> windowedValue) {
-        //System.out.println(AbstractParDoP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
         runner.processElement(windowedValue);
     }
 

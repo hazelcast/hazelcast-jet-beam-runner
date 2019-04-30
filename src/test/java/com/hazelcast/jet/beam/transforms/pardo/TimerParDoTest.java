@@ -237,8 +237,7 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    //todo: is ignored in beam too (https://issues.apache.org/jira/browse/BEAM-2791, https://issues.apache.org/jira/browse/BEAM-2535)
-    @Ignore
+    @Ignore //is ignored in beam too (https://issues.apache.org/jira/browse/BEAM-2791, https://issues.apache.org/jira/browse/BEAM-2535)
     public void testEventTimeTimerLoop() {
         final String stateId = "count";
         final String timerId = "timer";
@@ -283,7 +282,7 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
+    @Ignore //todo
     public void testEventTimeTimerMultipleKeys() {
         final String timerId = "foo";
         final String stateId = "sizzle";
@@ -418,7 +417,7 @@ public class TimerParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
+    @Ignore //manipulating processing time not supported in TestStream
     public void testProcessingTimeTimerCanBeReset() {
         final String timerId = "foo";
 

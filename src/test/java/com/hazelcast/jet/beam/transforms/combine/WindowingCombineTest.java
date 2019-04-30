@@ -225,7 +225,6 @@ public class WindowingCombineTest extends AbstractCombineTest {
     }
 
     @Test
-    @Ignore // trigger not supported
     public void testGlobalCombineWithDefaultsAndTriggers() {
         PCollection<Integer> input = pipeline.apply(Create.of(1, 1));
 

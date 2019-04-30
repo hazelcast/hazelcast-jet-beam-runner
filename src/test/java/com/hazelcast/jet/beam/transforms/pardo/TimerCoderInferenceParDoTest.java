@@ -29,7 +29,6 @@ import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.base.MoreObjects;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static junit.framework.TestCase.assertEquals;
@@ -38,10 +37,7 @@ import static junit.framework.TestCase.assertEquals;
 @SuppressWarnings("ALL")
 public class TimerCoderInferenceParDoTest extends AbstractParDoTest {
 
-    //todo: enable tests after state & timers are implemented
-
     @Test
-    @Ignore
     public void testValueStateCoderInference() {
         final String stateId = "foo";
         MyIntegerCoder myIntegerCoder = MyIntegerCoder.of();
@@ -76,7 +72,6 @@ public class TimerCoderInferenceParDoTest extends AbstractParDoTest {
     }
 
     @Test
-    @Ignore
     public void testValueStateCoderInferenceFromInputCoder() {
         final String stateId = "foo";
         MyIntegerCoder myIntegerCoder = MyIntegerCoder.of();

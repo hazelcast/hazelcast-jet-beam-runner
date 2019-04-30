@@ -119,7 +119,7 @@ public class FlattenTest extends AbstractTransformTest {
     }
 
     @Test
-    @Ignore //todo: requires the DAG to be a Multigraph (Flatten's main inputs contain the same PCollection twice), https://github.com/hazelcast/hazelcast-jet/pull/1332
+    @Ignore //requires the DAG to be a Multigraph (Flatten's main inputs contain the same PCollection twice), https://github.com/hazelcast/hazelcast-jet/pull/1332
     public void testFlattenInputMultipleCopies() {
         int count = 5;
         PCollection<Long> longs = pipeline.apply("mkLines", GenerateSequence.from(0).to(count));
@@ -288,7 +288,7 @@ public class FlattenTest extends AbstractTransformTest {
     }
 
     @Test
-    @Ignore //todo: requires the DAG to be a Multigraph (see the exception thrown), https://github.com/hazelcast/hazelcast-jet/pull/1332
+    @Ignore //requires the DAG to be a Multigraph (see the exception thrown), https://github.com/hazelcast/hazelcast-jet/pull/1332
     public void testFlattenMultiplePCollectionsHavingMultipleConsumers() {
         PCollection<String> input = pipeline.apply(Create.of("AA", "BBB", "CC"));
         final TupleTag<String> outputEvenLengthTag = new TupleTag<String>() {};

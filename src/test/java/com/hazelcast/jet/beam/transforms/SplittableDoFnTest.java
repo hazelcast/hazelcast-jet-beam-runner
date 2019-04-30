@@ -66,7 +66,7 @@ import static org.junit.Assert.assertTrue;
 /* "Inspired" by org.apache.beam.sdk.transforms.SplittableDoFnTest */
 public class SplittableDoFnTest extends AbstractTransformTest {
 
-    //todo: enable tests after splittable DoFns implemented
+    //todo: tests disabled due to splittable DoFns not being implemented
 
     private static class PairStringWithIndexToLengthBase extends DoFn<String, KV<String, Integer>> {
         @ProcessElement
