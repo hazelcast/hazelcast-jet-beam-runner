@@ -29,7 +29,7 @@
     </li>
     <li> <b><span style="color:#ca1;">&#x7E; GroupByKey</span></b>:
         Grouping of key-value pairs per key, window, and pane. Uses the Beam code for grouping by window.
-        <span style="color:red">Fully supported AFTER we add Trigger handling (1 day).</span>
+        Fully supported.
     </li>
     <li> <li> <b><span style="color:#ca1;">&#x2713; Flatten</span></b>:
         Concatenates multiple homogenously typed collections together.
@@ -49,12 +49,12 @@
         Side inputs are additional PCollections whose contents are computed during pipeline execution and then made accessible to DoFn code.
         The exact shape of the side input depends both on the PCollectionView used to describe the access pattern
         (interable, map, singleton) and the window of the element from the main input that is currently being processed.
-        <span style="color:red;">Supported when the side input source is bounded, other scenarios should be review-ed (1/2 day).</span>
+        <span style="color:red;">Supported when the side input source is bounded, other scenarios should be review-ed (4 hours).</span>
     </li>
     <li> <b><span style="color:#ca1;">&#x2713; Source API</span></b>:
         Allows users to provide additional input sources. Supports both bounded and unbounded data. Includes hooks
         necessary to provide efficient parallelization (size estimation, progress information, dynamic splitting, etc).
-        <span style="color:red;">Partially supported, bounded sources only. We could/should implement unbounded ones (2 days).</span>
+        <span style="color:red;">Partially supported, bounded sources only. We could/should implement unbounded ones (10 hours).</span>
     </li>
     <li> <b><span style="color:#ca1;">&#x2715; Splittable DoFn (SDF)</span></b>:
         Allows users to develop DoFn's that process a single element in portions ("restrictions"), executed in parallel or
@@ -73,7 +73,7 @@
         Allows fine-grained access to per-key, per-window persistent state. Necessary for certain use cases (e.g.
         high-volume windows which store large amounts of data, but typically only access small portions of it;
         complex state machines; etc.) that are not easily or efficiently addressed via Combine or GroupByKey+ParDo.
-        <span style="color:red;">Supported, but not sure about its limitations, needs some looking into (1/2 day).</span>
+        <span style="color:red">Should work, needs testing (2 hours).</span>
     </li>
 </ul>
 <p align="right"><a href="#top">Back to top</a></p>
@@ -113,11 +113,59 @@
 <p align="right"><a href="#top">Back to top</a></p>
 
 <h1 id="when" style="color:#6a4;">When in processing time?</h1>
-<span style="color:red;">To be reviewed after triggers have been added!</span>
+<ul style="list-style: none;">
+    <li> <b><span style="color:#6a4;">&#x2713; Configurable triggering</span></b>:
+        Triggering may be specified by the user (instead of simply driven by hardcoded defaults).
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#6a4;">&#x2713; Event-time triggers</span></b>:
+        Triggers that fire in response to event-time completeness signals, such as watermarks progressing.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#6a4;">&#x2713; Processing-time triggers</span></b>:
+        Triggers that fire in response to processing-time advancing.
+        Fully supported. <span style="color:red">Should work, needs testing (2 hours).</span>
+    </li>
+    <li> <b><span style="color:#6a4;">&#x2713; Count triggers</span></b>:
+        Triggers that fire after seeing at least N elements.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#6a4;">&#x2715; [Meta]data driven triggers</span></b>:
+        Triggers that fire in response to attributes of the data being processed.
+        No runner supports it.
+    </li>
+    <li> <b><span style="color:#6a4;">&#x2713; Composite triggers</span></b>:
+        Triggers which compose other triggers in more complex structures, such as logical AND, logical OR, early/on-time/late, etc.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#6a4;">&#x2713; Allowed lateness</span></b>:
+        A way to bound the useful lifetime of a window (in event time), after which any unemitted results may be materialized,
+        the window contents may be garbage collected, and any addtional late data that arrive for the window may be discarded.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#6a4;">&#x2713; Timers</span></b>:
+        A fine-grained mechanism for performing work at some point in the future, in either the event-time or processing-time domain.
+        Useful for orchestrating delayed events, timeouts, etc in complex state per-key, per-window state machines.
+        Fully supported. <span style="color:red">Should work, needs testing (2 hours).</span>
+    </li>
+</ul>
 <p align="right"><a href="#top">Back to top</a></p>
 
 <h1 id="how" style="color:#b55;">How do refinements relate?</h1>
-<span style="color:red;">To be reviewed after triggers have been added!</span>
+<ul style="list-style: none;">
+    <li> <b><span style="color:#b55;">&#x2713; Discarding</span></b>:
+        Elements are discarded from accumulated state as their pane is fired.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#b55;">&#x2713; Accumulating</span></b>:
+        Elements are discarded from accumulated state as their pane is fired.
+        Fully supported.
+    </li>
+    <li> <b><span style="color:#b55;">&#x2715; Accumulating & Retracting</span></b>:
+        Elements are accumulated across multiple pane firings and old emitted values are retracted. Also known as "backsies" ;-D
+        No runner supports it.
+    </li>
+</ul>
 <p align="right"><a href="#top">Back to top</a></p>
 
 </body>
