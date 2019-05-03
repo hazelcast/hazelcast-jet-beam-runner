@@ -112,7 +112,7 @@ public class ViewP extends AbstractProcessor {
         return () -> new ViewP(inputCoder, outputCoder, windowingStrategy, ownerId);
     }
 
-    public static class TimestampAndValues {
+    private static class TimestampAndValues {
         private final List<Object> values = new ArrayList<>();
         private Instant timestamp;
         private PaneInfo pane;

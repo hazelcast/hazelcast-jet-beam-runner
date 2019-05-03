@@ -64,11 +64,10 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
 
     private final SerializablePipelineOptions pipelineOptions;
     private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    private final Coder<K> inputValueKeyCoder;
     private final Coder<V> inputValueValueCoder;
     private final Coder outputCoder;
     private final WindowingStrategy<V, BoundedWindow> windowingStrategy;
-    private final Map<K, KeyManager<K, V, Iterable<V>, BoundedWindow>> keyManagers = new HashMap<>();
+    private final Map<K, KeyManager> keyManagers = new HashMap<>();
     private final AppendableTraverser<byte[]> appendableTraverser = new AppendableTraverser<>(128); //todo: right capacity?
     private final FlatMapper<byte[], byte[]> flatMapper;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
@@ -85,7 +84,6 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
             String ownerId
     ) {
         this.pipelineOptions = pipelineOptions;
-        this.inputValueKeyCoder = ((KvCoder<K, V>) inputValueCoder).getKeyCoder();
         this.inputValueValueCoder = ((KvCoder<K, V>) inputValueCoder).getValueCoder();
         this.outputCoder = outputCoder;
         this.windowingStrategy = windowingStrategy;
@@ -99,7 +97,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                         K key = kv.getKey();
                         V value = kv.getValue();
                         WindowedValue<V> updatedWindowedValue = WindowedValue.of(value, windowedValue.getTimestamp(), windowedValue.getWindows(), windowedValue.getPane());
-                        KeyManager<K, V, Iterable<V>, BoundedWindow> keyManager = keyManagers.computeIfAbsent(key, k -> new KeyManager<>(k, latestWatermark));
+                        KeyManager keyManager = keyManagers.computeIfAbsent(key, k -> new KeyManager(k, latestWatermark));
                         keyManager.processElement(updatedWindowedValue);
                     }
                     return appendableTraverser;
@@ -163,7 +161,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
         }
     }
 
-    private class KeyManager<K, InputT, OutputT, W extends BoundedWindow> {
+    private class KeyManager {
 
         private final InMemoryTimerInternals timerInternals;
         private final InMemoryStateInternalsImpl stateInternals;

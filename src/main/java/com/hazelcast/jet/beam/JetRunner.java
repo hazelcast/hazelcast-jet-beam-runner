@@ -21,7 +21,6 @@ import com.hazelcast.jet.IMapJet;
 import com.hazelcast.jet.Jet;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
-import com.hazelcast.jet.beam.metrics.JetMetricsContainer;
 import com.hazelcast.jet.core.DAG;
 import org.apache.beam.runners.core.construction.UnconsumedReads;
 import org.apache.beam.runners.core.metrics.MetricUpdates;
@@ -110,9 +109,9 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
 
     private JetPipelineResult run(DAG dag) {
         JetInstance jet = getJetInstance(options);
-        jet.getMap(METRICS_ACCUMULATOR_NAME).clear(); //clear metrics map
 
         IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(METRICS_ACCUMULATOR_NAME);
+        metricsAccumulator.clear();
         Job job = jet.newJob(dag);
 
         JetPipelineResult result = new JetPipelineResult(metricsAccumulator);
