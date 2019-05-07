@@ -98,7 +98,7 @@ public class DAGBuilder {
     Vertex addVertex(String id, SupplierEx<Processor> processor) {
         return dag
                 .newVertex(id, processor)
-                .localParallelism(localParallelism) //todo: quick and dirty hack for now, can't leave it like this
+                .localParallelism(localParallelism)
                 ;
     }
 
@@ -135,17 +135,15 @@ public class DAGBuilder {
         }
 
         private void addEdge(Vertex sourceVertex, Vertex destinationVertex, Coder coder, String edgeId, String pCollId, boolean sideInputEdge) {
-            //todo: set up the edges properly, including other aspects too, like parallelism
-
             try {
                 Edge edge = Edge
                         .from(sourceVertex, getNextFreeOrdinal(sourceVertex, false))
                         .to(destinationVertex, getNextFreeOrdinal(destinationVertex, true))
-                        .distributed(); //todo: why is it always distributed?
+                        .distributed();
                 if (sideInputEdge) {
                     edge = edge.broadcast();
                 } else {
-                    edge = edge.partitioned(new PartitionedKeyExtractor(coder)); // todo: we likely don't need to partition everything
+                    edge = edge.partitioned(new PartitionedKeyExtractor(coder));
                 }
                 dag.edge(edge);
 
@@ -193,7 +191,7 @@ public class DAGBuilder {
             if (t instanceof KV) {
                 key = ((KV) t).getKey();
             }
-            return key == null ? "all" : key; //todo: why "all"?
+            return key == null ? "all" : key;
         }
     }
 

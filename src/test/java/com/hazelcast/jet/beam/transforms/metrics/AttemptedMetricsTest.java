@@ -28,7 +28,6 @@ public class AttemptedMetricsTest extends AbstractMetricsTest {
         PipelineResult result = runPipelineWithMetrics();
         MetricQueryResults metrics = queryTestMetrics(result);
 
-        // TODO: BEAM-1169: Metrics shouldn't verify the physical values tightly.
         assertAllMetrics(metrics, false);
     }
 

@@ -82,7 +82,7 @@ public class ViewTest extends AbstractTransformTest {
                                         })
                                         .withSideInputs(view));
 
-        //PAssert.that(output).containsInAnyOrder(47, 47, 47); //todo
+        PAssert.that(output).containsInAnyOrder(47, 47, 47);
 
         PipelineResult.State state = pipeline.run().waitUntilFinish();
         assertEquals(PipelineResult.State.DONE, state);

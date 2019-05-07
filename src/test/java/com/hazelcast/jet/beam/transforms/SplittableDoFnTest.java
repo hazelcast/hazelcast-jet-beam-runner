@@ -535,8 +535,6 @@ public class SplittableDoFnTest extends AbstractTransformTest {
                         });
         PipelineResult.State state = pipeline.run().waitUntilFinish();
         assertEquals(PipelineResult.State.DONE, state);
-
-        // TODO: also test coverage when some of the windows of the side input are not ready.
     }
 
     private static class SDFWithAdditionalOutputBase extends DoFn<Integer, String> {
