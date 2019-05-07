@@ -23,6 +23,7 @@ import com.hazelcast.jet.beam.processors.ImpulseP;
 import com.hazelcast.jet.beam.processors.ParDoP;
 import com.hazelcast.jet.beam.processors.StatefulParDoP;
 import com.hazelcast.jet.beam.processors.TestStreamP;
+import com.hazelcast.jet.beam.processors.UnboundedSourceP;
 import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
 import com.hazelcast.jet.core.Processor;
@@ -37,6 +38,7 @@ import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.io.BoundedSource;
+import org.apache.beam.sdk.io.UnboundedSource;
 import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy.Node;
 import org.apache.beam.sdk.testing.TestStream;
@@ -92,16 +94,6 @@ class JetTransformTranslators {
         public Vertex translate(Pipeline pipeline, Node node, JetTranslationContext context) {
             AppliedPTransform<PBegin, PCollection<T>, PTransform<PBegin, PCollection<T>>> appliedTransform =
                     (AppliedPTransform<PBegin, PCollection<T>, PTransform<PBegin, PCollection<T>>>) node.toAppliedPTransform(pipeline);
-            if (!Utils.isBounded(appliedTransform)) {
-                throw new UnsupportedOperationException(); //todo
-            }
-
-            BoundedSource<T> source;
-            try {
-                source = ReadTranslation.boundedSourceFromTransform(appliedTransform);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
 
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             Coder outputCoder = Utils.getCoder((PCollection) Utils.getOutput(appliedTransform).getValue());
@@ -110,7 +102,7 @@ class JetTransformTranslators {
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
             SerializablePipelineOptions pipelineOptions = context.getOptions();
-            ProcessorMetaSupplier processorSupplier = BoundedSourceP.supplier(source, pipelineOptions, outputCoder, vertexId);
+            ProcessorMetaSupplier processorSupplier = getProcessorSupplier(appliedTransform, outputCoder, vertexId, pipelineOptions);
 
             Vertex vertex = dagBuilder.addVertex(vertexId, processorSupplier);
 
@@ -118,6 +110,28 @@ class JetTransformTranslators {
             dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
             dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex, outputCoder);
             return vertex;
+        }
+
+        private ProcessorMetaSupplier getProcessorSupplier(
+                AppliedPTransform<PBegin, PCollection<T>, PTransform<PBegin, PCollection<T>>> appliedTransform,
+                Coder outputCoder,
+                String vertexId,
+                SerializablePipelineOptions pipelineOptions
+        ) {
+            try {
+                if (Utils.isBounded(appliedTransform)) {
+                    BoundedSource<T> source = ReadTranslation.boundedSourceFromTransform(appliedTransform);
+                    return BoundedSourceP.supplier(source, pipelineOptions, outputCoder, vertexId);
+                } else {
+                    UnboundedSource<T, ?> source = ReadTranslation.unboundedSourceFromTransform(appliedTransform);
+                    if (source.requiresDeduping()) {
+                        throw new UnsupportedOperationException("Sources requiring deduping not supported!"); //todo
+                    }
+                    return UnboundedSourceP.supplier(source, pipelineOptions, outputCoder, vertexId);
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

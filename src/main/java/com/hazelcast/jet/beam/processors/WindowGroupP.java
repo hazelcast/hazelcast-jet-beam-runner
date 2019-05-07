@@ -68,8 +68,8 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
     private final Coder outputCoder;
     private final WindowingStrategy<V, BoundedWindow> windowingStrategy;
     private final Map<K, KeyManager> keyManagers = new HashMap<>();
-    private final AppendableTraverser<byte[]> appendableTraverser = new AppendableTraverser<>(128); //todo: right capacity?
-    private final FlatMapper<byte[], byte[]> flatMapper;
+    private final AppendableTraverser<Object> appendableTraverser = new AppendableTraverser<>(128); //todo: right capacity?
+    private final FlatMapper<Object, Object> flatMapper;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
 
@@ -91,8 +91,12 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
 
         this.flatMapper = flatMapper(
                 item -> {
-                    if (item != null) {
-                        WindowedValue<KV<K, V>> windowedValue = Utils.decodeWindowedValue(item, inputCoder);
+                    if (item == null) {
+                        //do nothing
+                    } else if (item instanceof Watermark) {
+                        appendableTraverser.append(item);
+                    } else {
+                        WindowedValue<KV<K, V>> windowedValue = Utils.decodeWindowedValue((byte[]) item, inputCoder);
                         KV<K, V> kv = windowedValue.getValue();
                         K key = kv.getKey();
                         V value = kv.getValue();
@@ -121,18 +125,19 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
 
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
-        return flatMapper.tryProcess((byte[]) item);
+        return flatMapper.tryProcess(item);
     }
 
     @Override
     public boolean tryProcessWatermark(@Nonnull Watermark watermark) {
         advanceWatermark(watermark.timestamp());
-        return flatMapper.tryProcess(null);
+        return flatMapper.tryProcess(watermark);
     }
 
     @Override
     public boolean complete() {
-        advanceWatermark(BoundedWindow.TIMESTAMP_MAX_VALUE.getMillis());
+        long millis = BoundedWindow.TIMESTAMP_MAX_VALUE.getMillis();
+        advanceWatermark(millis);
         return flatMapper.tryProcess(null);
     }
 
@@ -182,10 +187,6 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                         @Override
                         public void outputWindowedValue(KV<K, Iterable<V>> output, Instant timestamp, Collection<? extends BoundedWindow> windows, PaneInfo pane) {
                             WindowedValue<KV<K, Iterable<V>>> windowedValue = WindowedValue.of(output, timestamp, windows, pane);
-                            if (ownerId.startsWith("3 ")) {
-                                new Throwable(WindowGroupP.class.getSimpleName() + " OUTPUT " + System.identityHashCode(WindowGroupP.this) + ", windowedValue = " + windowedValue).printStackTrace();
-                            } //todo: remove
-                            //System.err.println(WindowGroupP.class.getSimpleName() + " OUTPUT ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
                             byte[] encodedValue = Utils.encodeWindowedValue(windowedValue, outputCoder, baos);
                             //noinspection ResultOfMethodCallIgnored
                             appendableTraverser.append(encodedValue);

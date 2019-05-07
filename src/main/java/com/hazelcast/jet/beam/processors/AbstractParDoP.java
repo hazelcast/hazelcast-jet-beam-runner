@@ -272,8 +272,6 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
 
     @Override
     public boolean complete() {
-        //System.out.println(ParDoP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
-        //if (ownerId.startsWith("8 ")) System.out.println(ParDoP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         boolean successful = outputManager.tryFlush();
         if (successful) {
             metricsContainer.flush();
