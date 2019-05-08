@@ -17,9 +17,9 @@
 package com.hazelcast.jet.beam;
 
 import com.hazelcast.jet.core.DAG;
-import com.hazelcast.jet.core.Vertex;
 import org.apache.beam.runners.core.construction.PTransformTranslation;
 import org.apache.beam.sdk.Pipeline;
+import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.values.PValue;
@@ -81,7 +81,9 @@ class JetGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
     ) {
         @SuppressWarnings("unchecked")
         JetTransformTranslator<T> typedTranslator = (JetTransformTranslator<T>) translator;
-        typedTranslator.translate(getPipeline(), node, translationContext);
+        Pipeline pipeline = getPipeline();
+        AppliedPTransform<?, ?, ?> appliedTransform = node.toAppliedPTransform(pipeline);
+        typedTranslator.translate(pipeline, appliedTransform, node, translationContext);
     }
 
 }

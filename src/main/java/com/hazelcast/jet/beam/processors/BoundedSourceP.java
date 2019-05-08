@@ -30,7 +30,6 @@ import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.util.WindowedValue;
 
 import javax.annotation.Nonnull;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,7 +42,6 @@ import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 
 public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
 
-    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final Traverser<BoundedSource<T>> shardsTraverser;
     private final PipelineOptions options;
     private final Coder outputCoder;
@@ -75,7 +73,7 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
             if (!currentReader.advance()) {
                 nextShard();
             }
-            return outputCoder == null ? res : Utils.encodeWindowedValue(res, outputCoder, baos); //todo: this is not nice, have done this only as a quick fix for BoundedSourcePTest
+            return outputCoder == null ? res : Utils.encodeWindowedValue(res, outputCoder); //todo: this is not nice, have done this only as a quick fix for BoundedSourcePTest
         } catch (IOException e) {
             throw rethrow(e);
         }

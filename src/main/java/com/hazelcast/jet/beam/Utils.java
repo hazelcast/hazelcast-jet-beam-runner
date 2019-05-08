@@ -27,6 +27,7 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
+import org.apache.beam.sdk.util.CoderUtils;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionView;
@@ -56,8 +57,12 @@ public class Utils {
 
     public static String getTupleTagId(PValue value) {
         Map<TupleTag<?>, PValue> expansion = value.expand();
-        if (expansion.size() != 1) throw new RuntimeException(); //todo: Houston, we have a problem!
-        return expansion.keySet().iterator().next().getId();
+        return Iterables.getOnlyElement(expansion.keySet()).getId();
+    }
+
+    static PValue getMainInput(Pipeline pipeline, TransformHierarchy.Node node) {
+        Collection<PValue> mainInputs = getMainInputs(pipeline, node);
+        return mainInputs == null ? null : Iterables.getOnlyElement(mainInputs);
     }
 
     static Collection<PValue> getMainInputs(Pipeline pipeline, TransformHierarchy.Node node) {
@@ -163,8 +168,7 @@ public class Utils {
 
         if (outputs == null || outputs.isEmpty()) throw new IllegalStateException("No outputs defined.");
 
-        TupleTag<?> tag = outputs.keySet().iterator().next();
-        PValue taggedValue = outputs.get(tag);
+        PValue taggedValue = outputs.values().iterator().next();
         checkState(
                 taggedValue instanceof PCollection,
                 "Within ParDo, got a non-PCollection output %s of type %s",
@@ -215,11 +219,9 @@ public class Utils {
         }
     }
 
-    public static <T> byte[] encodeWindowedValue(WindowedValue<T> windowedValue, Coder coder, ByteArrayOutputStream baos) {
+    public static <T> byte[] encodeWindowedValue(WindowedValue<T> windowedValue, Coder coder) {
         try {
-            baos.reset();
-            coder.encode(windowedValue, baos);
-            return baos.toByteArray();
+            return CoderUtils.encodeToByteArray(coder, windowedValue);
         } catch (IOException e) {
             throw rethrow(e);
         }
@@ -227,7 +229,7 @@ public class Utils {
 
     public static <T> WindowedValue<T> decodeWindowedValue(byte[] item, Coder coder) {
         try {
-            return (WindowedValue<T>) coder.decode(new ByteArrayInputStream(item));
+            return (WindowedValue<T>) CoderUtils.decodeFromByteArray(coder, item);
         } catch (IOException e) {
             throw rethrow(e);
         }

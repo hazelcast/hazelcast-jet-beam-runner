@@ -47,7 +47,6 @@ import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Lists;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
-import java.io.ByteArrayOutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -126,7 +125,6 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         this.ordinalToSideInput = ordinalToSideInput;
         this.ownerId = ownerId;
         this.stepId = stepId;
-        //System.out.println(ParDoP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
@@ -286,7 +284,6 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
      */
     static class JetOutputManager implements DoFnRunners.OutputManager {
 
-        private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         private final Outbox outbox;
         private final Map<TupleTag<?>, Coder<?>> outputCoders;
         private final Map<TupleTag<?>, int[]> outputCollToOrdinals;
@@ -310,7 +307,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         public <T> void output(TupleTag<T> tag, WindowedValue<T> outputValue) {
             assert currentBucket == 0 && currentItem == 0 : "adding output while flushing";
             Coder<?> coder = outputCoders.get(tag);
-            byte[] output = Utils.encodeWindowedValue(outputValue, coder, baos);
+            byte[] output = Utils.encodeWindowedValue(outputValue, coder);
             for (int ordinal : outputCollToOrdinals.get(tag)) {
                 outputBuckets[ordinal].add(output);
             }

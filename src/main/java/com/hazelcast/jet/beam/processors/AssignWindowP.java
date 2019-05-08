@@ -31,7 +31,6 @@ import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Iterables;
 import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
-import java.io.ByteArrayOutputStream;
 import java.util.Collection;
 
 public class AssignWindowP<InputT> extends AbstractProcessor {
@@ -40,7 +39,6 @@ public class AssignWindowP<InputT> extends AbstractProcessor {
     private final String ownerId; //do not remove, useful for debugging
 
     private final ResettableSingletonTraverser<byte[]> traverser = new ResettableSingletonTraverser<>();
-    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final FlatMapper<byte[], byte[]> flatMapper;
     private final WindowAssignContext<InputT> windowAssignContext;
 
@@ -64,7 +62,7 @@ public class AssignWindowP<InputT> extends AbstractProcessor {
                 throw new RuntimeException(e);
             }
             WindowedValue<InputT> outputValue = WindowedValue.of(inputValue.getValue(), inputValue.getTimestamp(), windows, inputValue.getPane());
-            traverser.accept(Utils.encodeWindowedValue(outputValue, outputCoder, baos));
+            traverser.accept(Utils.encodeWindowedValue(outputValue, outputCoder));
             return traverser;
         });
     }
@@ -73,12 +71,6 @@ public class AssignWindowP<InputT> extends AbstractProcessor {
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
         return flatMapper.tryProcess((byte[]) item);
-    }
-
-    @Override
-    public boolean tryProcessWatermark(@Nonnull Watermark watermark) {
-        //System.err.println(ownerId + "/" + System.identityHashCode(this) + ": watermark = " + watermark + ", on thread: " + Thread.currentThread());
-        return super.tryProcessWatermark(watermark);
     }
 
     public static <InputT> SupplierEx<Processor> supplier(

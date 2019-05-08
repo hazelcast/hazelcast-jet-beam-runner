@@ -33,7 +33,6 @@ import org.apache.beam.sdk.util.WindowedValue;
 import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,7 +47,6 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
 
     private static final Instant INSTANT_ZERO = new Instant(0);
 
-    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final UnboundedSource.UnboundedReader<T>[] readers;
     private final Instant[] watermarks;
     private final PipelineOptions options;
@@ -99,7 +97,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
 
                     Object item = currentReader.getCurrent();
                     WindowedValue<Object> res = WindowedValue.timestampedValueInGlobalWindow(item, currentReader.getCurrentTimestamp());
-                    return Utils.encodeWindowedValue(res, outputCoder, baos);
+                    return Utils.encodeWindowedValue(res, outputCoder);
                 }
 
                 currentReaderIndex++;

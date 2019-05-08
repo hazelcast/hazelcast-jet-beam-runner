@@ -26,13 +26,11 @@ import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.util.WindowedValue;
 
 import javax.annotation.Nonnull;
-import java.io.ByteArrayOutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
 public class FlattenP extends AbstractProcessor {
 
-    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final Map<Integer, Coder> inputOrdinalCoders;
     private final Coder outputCoder;
     @SuppressWarnings("FieldCanBeLocal") //do not remove, useful for debugging
@@ -42,15 +40,13 @@ public class FlattenP extends AbstractProcessor {
         this.inputOrdinalCoders = inputOrdinalCoders;
         this.outputCoder = outputCoder;
         this.ownerId = ownerId;
-        //System.out.println(FlattenP.class.getSimpleName() + " CREATE, ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
         Coder inputCoder = inputOrdinalCoders.get(ordinal);
         WindowedValue<Object> windowedValue = Utils.decodeWindowedValue((byte[]) item, inputCoder);
-        //System.out.println(FlattenP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", windowedValue = " + windowedValue); //useful for debugging
-        return tryEmit(Utils.encodeWindowedValue(windowedValue, outputCoder, baos));
+        return tryEmit(Utils.encodeWindowedValue(windowedValue, outputCoder));
     }
 
     public static final class Supplier implements SupplierEx<Processor>, DAGBuilder.WiringListener {
@@ -68,7 +64,7 @@ public class FlattenP extends AbstractProcessor {
         }
 
         @Override
-        public Processor getEx() throws Exception {
+        public Processor getEx() {
             return new FlattenP(inputOrdinalCoders, outputCoder, ownerId);
         }
 

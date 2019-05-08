@@ -30,7 +30,6 @@ import org.apache.beam.sdk.values.WindowingStrategy;
 import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
-import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,7 +44,6 @@ import static com.hazelcast.jet.Traversers.traverseStream;
  */
 public class ViewP extends AbstractProcessor {
 
-    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final TimestampCombiner timestampCombiner;
     private final Coder inputCoder;
     private final Coder outputCoder;
@@ -65,12 +63,10 @@ public class ViewP extends AbstractProcessor {
         this.inputCoder = inputCoder;
         this.outputCoder = Utils.deriveIterableValueCoder((WindowedValue.FullWindowedValueCoder) outputCoder);
         this.ownerId = ownerId;
-        //System.out.println(ViewP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
     @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
-        //System.out.println(ViewP.class.getSimpleName() + " UPDATE ownerId = " + ownerId + ", item = " + item); //useful for debugging
         WindowedValue<?> windowedValue = Utils.decodeWindowedValue((byte[]) item, inputCoder);
         for (BoundedWindow window : windowedValue.getWindows()) {
             values
@@ -84,7 +80,6 @@ public class ViewP extends AbstractProcessor {
 
     @Override
     public boolean complete() {
-        //System.out.println(ViewP.class.getSimpleName() + " COMPLETE ownerId = " + ownerId); //useful for debugging
         if (resultTraverser == null) {
             resultTraverser = traverseStream(
                     values.entrySet().stream().map(
@@ -95,7 +90,7 @@ public class ViewP extends AbstractProcessor {
                                         Collections.singleton(e.getKey()),
                                         e.getValue().pane
                                 );
-                                return Utils.encodeWindowedValue(outputValue, outputCoder, baos);
+                                return Utils.encodeWindowedValue(outputValue, outputCoder);
                             }
                     )
             );

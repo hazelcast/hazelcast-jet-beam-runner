@@ -49,7 +49,6 @@ import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -62,8 +61,9 @@ import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 
 public class WindowGroupP<K, V> extends AbstractProcessor {
 
+    private static final Object NULL = new Object();
+
     private final SerializablePipelineOptions pipelineOptions;
-    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final Coder<V> inputValueValueCoder;
     private final Coder outputCoder;
     private final WindowingStrategy<V, BoundedWindow> windowingStrategy;
@@ -91,7 +91,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
 
         this.flatMapper = flatMapper(
                 item -> {
-                    if (item == null) {
+                    if (NULL == item) {
                         //do nothing
                     } else if (item instanceof Watermark) {
                         appendableTraverser.append(item);
@@ -107,8 +107,6 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                     return appendableTraverser;
                 }
         );
-
-        //System.err.println(WindowGroupP.class.getSimpleName() + " CREATE ownerId = " + ownerId); //useful for debugging
     }
 
     @SuppressWarnings("unchecked")
@@ -138,7 +136,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
     public boolean complete() {
         long millis = BoundedWindow.TIMESTAMP_MAX_VALUE.getMillis();
         advanceWatermark(millis);
-        return flatMapper.tryProcess(null);
+        return flatMapper.tryProcess(NULL);
     }
 
     private void advanceWatermark(long millis) {
@@ -187,7 +185,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                         @Override
                         public void outputWindowedValue(KV<K, Iterable<V>> output, Instant timestamp, Collection<? extends BoundedWindow> windows, PaneInfo pane) {
                             WindowedValue<KV<K, Iterable<V>>> windowedValue = WindowedValue.of(output, timestamp, windows, pane);
-                            byte[] encodedValue = Utils.encodeWindowedValue(windowedValue, outputCoder, baos);
+                            byte[] encodedValue = Utils.encodeWindowedValue(windowedValue, outputCoder);
                             //noinspection ResultOfMethodCallIgnored
                             appendableTraverser.append(encodedValue);
                         }

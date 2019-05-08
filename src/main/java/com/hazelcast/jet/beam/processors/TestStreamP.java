@@ -28,7 +28,6 @@ import org.apache.beam.sdk.util.WindowedValue;
 import org.joda.time.Instant;
 
 import javax.annotation.Nullable;
-import java.io.ByteArrayOutputStream;
 import java.io.Serializable;
 import java.util.List;
 import java.util.stream.Stream;
@@ -39,7 +38,6 @@ import static java.util.stream.Collectors.toList;
 
 public class TestStreamP extends AbstractProcessor {
 
-    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private final Traverser traverser;
 
     @SuppressWarnings("unchecked")
@@ -56,7 +54,7 @@ public class TestStreamP extends AbstractProcessor {
                     } else {
                         assert event instanceof SerializableTimestampedValue;
                         WindowedValue windowedValue = ((SerializableTimestampedValue) event).asWindowedValue();
-                        return Utils.encodeWindowedValue(windowedValue, outputCoder, baos);
+                        return Utils.encodeWindowedValue(windowedValue, outputCoder);
                     }
                 });
     }
@@ -73,7 +71,7 @@ public class TestStreamP extends AbstractProcessor {
         return ProcessorMetaSupplier.forceTotalParallelismOne(ProcessorSupplier.of(() -> new TestStreamP(serializableEvents, outputCoder)));
     }
 
-    private static <T> List<Object> getSerializableEvents(List<TestStream.Event<T>> events) {
+    private static <T> List<Object> getSerializableEvents(List<TestStream.Event<T>> events) { //todo: use TestStream.TestStreamCoder instead, when it gets released (done in Beam module)
         return events.stream()
                 .flatMap(e -> {
                     if (e instanceof TestStream.WatermarkEvent) {
