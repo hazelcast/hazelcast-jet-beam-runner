@@ -28,7 +28,6 @@ import org.apache.beam.sdk.util.CoderUtils;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
 
-import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -137,14 +136,15 @@ public class DAGBuilder {
 
         private void addEdge(Vertex sourceVertex, Vertex destinationVertex, Coder coder, String edgeId, String pCollId, boolean sideInputEdge) {
             try {
+                boolean carriesKeyedValues = Utils.isKeyedValueCoder(coder);
                 Edge edge = Edge
                         .from(sourceVertex, getNextFreeOrdinal(sourceVertex, false))
-                        .to(destinationVertex, getNextFreeOrdinal(destinationVertex, true))
-                        .distributed();
+                        .to(destinationVertex, getNextFreeOrdinal(destinationVertex, true));
+                edge = carriesKeyedValues ? edge.distributed() : edge;
                 if (sideInputEdge) {
                     edge = edge.broadcast();
                 } else {
-                    edge = edge.partitioned(new PartitionedKeyExtractor(coder));
+                    edge = carriesKeyedValues ? edge.partitioned(new PartitionedKeyExtractor(coder)) : edge;
                 }
                 dag.edge(edge);
 
@@ -178,7 +178,7 @@ public class DAGBuilder {
     private static class PartitionedKeyExtractor implements FunctionEx<byte[], Object> {
         private final Coder coder;
 
-        public PartitionedKeyExtractor(Coder coder) {
+        PartitionedKeyExtractor(Coder coder) {
             this.coder = coder;
         }
 
@@ -191,8 +191,10 @@ public class DAGBuilder {
             }
             if (t instanceof KV) {
                 key = ((KV) t).getKey();
+            } else {
+                throw new RuntimeException("Oops!");
             }
-            return key == null ? "all" : key;
+            return key == null ? "null" : key;
         }
     }
 

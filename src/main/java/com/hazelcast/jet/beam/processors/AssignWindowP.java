@@ -20,7 +20,6 @@ import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ResettableSingletonTraverser;
-import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
@@ -73,10 +72,10 @@ public class AssignWindowP<InputT> extends AbstractProcessor {
         return flatMapper.tryProcess((byte[]) item);
     }
 
-    public static <InputT> SupplierEx<Processor> supplier(
+    public static <T> SupplierEx<Processor> supplier(
             Coder inputCoder,
             Coder outputCoder,
-            WindowingStrategy<InputT, BoundedWindow> windowingStrategy,
+            WindowingStrategy<T, BoundedWindow> windowingStrategy,
             String ownerId
     ) {
         return () -> new AssignWindowP<>(inputCoder, outputCoder, windowingStrategy, ownerId);

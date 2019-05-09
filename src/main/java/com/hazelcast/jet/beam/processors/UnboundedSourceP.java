@@ -69,7 +69,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
     }
 
     @Override
-    protected void init(@Nonnull Processor.Context context) throws Exception {
+    protected void init(@Nonnull Processor.Context context)  {
         Arrays.stream(readers).forEach(UnboundedSourceP::startReader);
         currentReaderIndex = 0;
         lastSentWatermark = 0;

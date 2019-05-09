@@ -20,6 +20,7 @@ import org.apache.beam.runners.core.construction.ParDoTranslation;
 import org.apache.beam.runners.core.construction.TransformInputs;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.coders.Coder;
+import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.ListCoder;
 import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy;
@@ -100,6 +101,15 @@ public class Utils {
 
     static <T> boolean isBounded(AppliedPTransform<?, ?, ?> appliedTransform) {
         return ((PCollection) getOutput(appliedTransform).getValue()).isBounded().equals(PCollection.IsBounded.BOUNDED);
+    }
+
+    static boolean isKeyedValueCoder(Coder coder) {
+        if (coder instanceof KvCoder) {
+            return true;
+        } else if (coder instanceof WindowedValue.WindowedValueCoder) {
+            return ((WindowedValue.WindowedValueCoder) coder).getValueCoder() instanceof KvCoder;
+        }
+        return false;
     }
 
     static Coder getCoder(PCollection pCollection) {
