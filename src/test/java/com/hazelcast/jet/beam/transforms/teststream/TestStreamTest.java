@@ -70,7 +70,6 @@ public class TestStreamTest extends AbstractTransformTest {
     public transient ExpectedException thrown = ExpectedException.none();
 
     @Test
-    @Ignore //works only without parallelism, due to watermark coalescing
     public void testLateDataAccumulating() {
         Instant instant = new Instant(0);
         TestStream<Integer> source =
@@ -169,7 +168,6 @@ public class TestStreamTest extends AbstractTransformTest {
     }
 
     @Test
-    @Ignore //works only without parallelism, due to watermark coalescing
     public void testDiscardingMode() {
         TestStream<String> stream =
                 TestStream.create(StringUtf8Coder.of())
@@ -219,7 +217,6 @@ public class TestStreamTest extends AbstractTransformTest {
     }
 
     @Test
-    @Ignore //works only without parallelism, due to watermark coalescing
     public void testFirstElementLate() {
         Instant lateElementTimestamp = new Instant(-1_000_000);
         TestStream<String> stream =

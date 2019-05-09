@@ -21,6 +21,7 @@ import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;
 import com.hazelcast.jet.core.Watermark;
+import com.hazelcast.jet.impl.util.ThrottleWrappedP;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.testing.TestStream;
 import org.apache.beam.sdk.util.WindowedValue;
@@ -67,7 +68,14 @@ public class TestStreamP extends AbstractProcessor {
 
     public static <T> ProcessorMetaSupplier supplier(List<TestStream.Event<T>> events, Coder outputCoder) {
         List<Object> serializableEvents = getSerializableEvents(events);
-        return ProcessorMetaSupplier.forceTotalParallelismOne(ProcessorSupplier.of(() -> new TestStreamP(serializableEvents, outputCoder)));
+        return ProcessorMetaSupplier.forceTotalParallelismOne(
+                ProcessorSupplier.of(
+                        () -> new ThrottleWrappedP(
+                                new TestStreamP(serializableEvents, outputCoder),
+                                4
+                        )
+                )
+        );
     }
 
     private static <T> List<Object> getSerializableEvents(List<TestStream.Event<T>> events) { //todo: use TestStream.TestStreamCoder instead, when it gets released (done in Beam module)
