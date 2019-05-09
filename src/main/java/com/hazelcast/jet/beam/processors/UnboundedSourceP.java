@@ -17,6 +17,7 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
+import com.hazelcast.jet.Traversers;
 import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
@@ -27,9 +28,9 @@ import com.hazelcast.nio.Address;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.io.UnboundedSource;
+import org.apache.beam.sdk.io.UnboundedSource.UnboundedReader;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.util.WindowedValue;
-import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -39,18 +40,16 @@ import java.util.function.Function;
 
 import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 
-public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> extends AbstractProcessor implements Traverser<Object> {
+public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> extends AbstractProcessor {
 
     private UnboundedSource.UnboundedReader<T>[] readers;
-    private Instant[] watermarks;
     private final List<? extends UnboundedSource<T, CMT>> allShards;
     private final PipelineOptions options;
     private final Coder outputCoder;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove it, very useful for debugging
 
-    private int currentReaderIndex;
-    private long lastSentWatermark;
+    private Traverser<Object> traverser;
 
     private UnboundedSourceP(List<? extends UnboundedSource<T, CMT>> allShards, PipelineOptions options, Coder outputCoder, String ownerId) {
         this.allShards = allShards;
@@ -60,56 +59,31 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
     }
 
     @Override
-    protected void init(@Nonnull Processor.Context context) {
+    protected void init(@Nonnull Processor.Context context) throws IOException {
         List<? extends UnboundedSource<T, CMT>> myShards =
                 Utils.roundRobinSubList(allShards, context.globalProcessorIndex(), context.totalParallelism());
         this.readers = createReaders(myShards, options);
-        this.watermarks = initWatermarks(myShards.size());
-        Arrays.stream(readers).forEach(UnboundedSourceP::startReader);
-        currentReaderIndex = 0;
-        lastSentWatermark = 0;
-    }
 
-    @Override
-    public Object next() {
-        Instant minWatermark = getMin(watermarks);
-        if (minWatermark.isAfter(lastSentWatermark)) {
-            lastSentWatermark = minWatermark.getMillis();
-            return new Watermark(lastSentWatermark);
+        Function<UnboundedReader<T>, byte[]> mapFn = (reader) -> Utils.encodeWindowedValue(
+                WindowedValue.timestampedValueInGlobalWindow(reader.getCurrent(), reader.getCurrentTimestamp()), outputCoder);
+
+        if (myShards.size() == 0) {
+            traverser = Traversers.empty();
+        } else if (myShards.size() == 1) {
+            traverser = new SingleReaderTraverser<>(readers[0], mapFn);
+        } else {
+            traverser = new CoalescingTraverser<>(readers, mapFn);
         }
 
-        try {
-            //trying to fetch a value from the next reader
-            for (int i = 0; i < readers.length; i++) {
-                currentReaderIndex++;
-                if (currentReaderIndex >= readers.length) {
-                    currentReaderIndex = 0;
-                }
-                UnboundedSource.UnboundedReader<T> currentReader = readers[currentReaderIndex];
-                if (currentReader.advance()) {
-                    Instant currentWatermark = currentReader.getWatermark();
-                    watermarks[currentReaderIndex] = currentWatermark; //todo: we should probably do this only on a timer...
-
-                    Object item = currentReader.getCurrent();
-                    WindowedValue<Object> res = WindowedValue.timestampedValueInGlobalWindow(item, currentReader.getCurrentTimestamp());
-                    return Utils.encodeWindowedValue(res, outputCoder);
-                }
-            }
-
-            //all advances have failed
-            return null;
-        } catch (IOException e) {
-            throw rethrow(e);
+        for (UnboundedReader<T> reader : readers) {
+            reader.start();
         }
     }
 
     @Override
     public boolean complete() {
-        if (readers.length == 0) {
-            return true;
-        }
-        emitFromTraverser(this);
-        return false;
+        emitFromTraverser(traverser);
+        return readers.length == 0;
     }
 
     @Override
@@ -131,23 +105,15 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
                 .toArray(UnboundedSource.UnboundedReader[]::new);
     }
 
-    private static Instant[] initWatermarks(int size) {
-        Instant[] watermarks = new Instant[size];
-        Arrays.fill(watermarks, new Instant(Long.MIN_VALUE));
+    private static long[] initWatermarks(int size) {
+        long[] watermarks = new long[size];
+        Arrays.fill(watermarks, Long.MIN_VALUE);
         return watermarks;
     }
 
     private static <T> UnboundedSource.UnboundedReader<T> createReader(PipelineOptions options, UnboundedSource<T, ?> shard) {
         try {
             return shard.createReader(options, null);
-        } catch (IOException e) {
-            throw rethrow(e);
-        }
-    }
-
-    private static void startReader(UnboundedSource.UnboundedReader<?> reader) {
-        try {
-            reader.start();
         } catch (IOException e) {
             throw rethrow(e);
         }
@@ -161,10 +127,10 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         }
     }
 
-    private static Instant getMin(Instant[] instants) {
-        Instant min = instants[0];
+    private static long getMin(long[] instants) {
+        long min = instants[0];
         for (int i = 1; i < instants.length; i++) {
-            if (instants[i].isBefore(min)) {
+            if (instants[i] < min) {
                 min = instants[i];
             }
         }
@@ -210,6 +176,82 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         @Override
         public Function<? super Address, ? extends ProcessorSupplier> get(@Nonnull List<Address> addresses) {
             return address -> ProcessorSupplier.of(() -> new UnboundedSourceP<>(shards, options.get(), outputCoder, ownerId));
+        }
+    }
+
+    private static class SingleReaderTraverser<InputT> implements Traverser<Object> {
+        private final UnboundedReader<InputT> reader;
+        private final Function<UnboundedReader<InputT>, byte[]> mapFn;
+        private long lastWatermark = Long.MIN_VALUE;
+
+        SingleReaderTraverser(UnboundedReader<InputT> reader, Function<UnboundedReader<InputT>, byte[]> mapFn) {
+            this.reader = reader;
+            this.mapFn = mapFn;
+        }
+
+        @Override
+        public Object next() {
+            long wm = reader.getWatermark().getMillis();
+            if (wm > lastWatermark) {
+                lastWatermark = wm;
+                return new Watermark(wm);
+            }
+            try {
+                return reader.advance() ? mapFn.apply(reader) : null;
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private static class CoalescingTraverser<InputT> implements Traverser<Object> {
+        private final UnboundedReader<InputT>[] readers;
+        private final Function<UnboundedReader<InputT>, byte[]> mapFn;
+
+        private int currentReaderIndex;
+        private long minWatermark = Long.MIN_VALUE;
+        private long lastSentWatermark = Long.MIN_VALUE;
+        private long[] watermarks;
+
+        CoalescingTraverser(UnboundedReader<InputT>[] readers, Function<UnboundedReader<InputT>, byte[]> mapFn) {
+            this.readers = readers;
+            watermarks = initWatermarks(readers.length);
+            this.mapFn = mapFn;
+        }
+
+        @Override
+        public Object next() {
+            if (minWatermark > lastSentWatermark) {
+                lastSentWatermark = minWatermark;
+                return new Watermark(lastSentWatermark);
+            }
+
+            try {
+                //trying to fetch a value from the next reader
+                for (int i = 0; i < readers.length; i++) {
+                    currentReaderIndex++;
+                    if (currentReaderIndex >= readers.length) {
+                        currentReaderIndex = 0;
+                    }
+                    UnboundedSource.UnboundedReader<InputT> currentReader = readers[currentReaderIndex];
+                    if (currentReader.advance()) {
+                        long currentWatermark = currentReader.getWatermark().getMillis();
+                        long origWatermark = watermarks[currentReaderIndex];
+                        if (currentWatermark > origWatermark) {
+                            watermarks[currentReaderIndex] = currentWatermark; //todo: we should probably do this only on a timer...
+                            if (origWatermark == minWatermark) {
+                                minWatermark = getMin(watermarks);
+                            }
+                        }
+                        return mapFn.apply(currentReader);
+                    }
+                }
+
+                //all advances have failed
+                return null;
+            } catch (IOException e) {
+                throw rethrow(e);
+            }
         }
     }
 }
