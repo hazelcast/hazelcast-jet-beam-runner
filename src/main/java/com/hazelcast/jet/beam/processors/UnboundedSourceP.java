@@ -39,9 +39,7 @@ import java.util.function.Function;
 
 import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 
-public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> extends AbstractProcessor implements Traverser {
-
-    private static final Instant INSTANT_ZERO = new Instant(0);
+public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> extends AbstractProcessor implements Traverser<Object> {
 
     private UnboundedSource.UnboundedReader<T>[] readers;
     private Instant[] watermarks;
@@ -83,6 +81,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         try {
             //trying to fetch a value from the next reader
             for (int i = 0; i < readers.length; i++) {
+                currentReaderIndex++;
                 if (currentReaderIndex >= readers.length) {
                     currentReaderIndex = 0;
                 }
@@ -95,8 +94,6 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
                     WindowedValue<Object> res = WindowedValue.timestampedValueInGlobalWindow(item, currentReader.getCurrentTimestamp());
                     return Utils.encodeWindowedValue(res, outputCoder);
                 }
-
-                currentReaderIndex++;
             }
 
             //all advances have failed
@@ -111,7 +108,8 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         if (readers.length == 0) {
             return true;
         }
-        return emitFromTraverser(this);
+        emitFromTraverser(this);
+        return false;
     }
 
     @Override
@@ -135,7 +133,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
 
     private static Instant[] initWatermarks(int size) {
         Instant[] watermarks = new Instant[size];
-        Arrays.fill(watermarks, INSTANT_ZERO);
+        Arrays.fill(watermarks, new Instant(Long.MIN_VALUE));
         return watermarks;
     }
 
