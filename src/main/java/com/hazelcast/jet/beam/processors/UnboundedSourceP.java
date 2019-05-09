@@ -143,10 +143,10 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
             Coder outputCoder,
             String ownerId
     ) {
-        return new UnboundedSourceMetaProcessorSupplier<>(unboundedSource, options, outputCoder, ownerId);
+        return new UnboundedSourceProcessorMetaSupplier<>(unboundedSource, options, outputCoder, ownerId);
     }
 
-    private static class UnboundedSourceMetaProcessorSupplier<T, CMT extends UnboundedSource.CheckpointMark> implements ProcessorMetaSupplier {
+    private static class UnboundedSourceProcessorMetaSupplier<T, CMT extends UnboundedSource.CheckpointMark> implements ProcessorMetaSupplier {
 
         private final UnboundedSource<T, CMT> unboundedSource;
         private final SerializablePipelineOptions options;
@@ -155,7 +155,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
 
         private List<? extends UnboundedSource<T, CMT>> shards;
 
-        private UnboundedSourceMetaProcessorSupplier(
+        private UnboundedSourceProcessorMetaSupplier(
                 UnboundedSource<T, CMT> unboundedSource,
                 SerializablePipelineOptions options,
                 Coder outputCoder,

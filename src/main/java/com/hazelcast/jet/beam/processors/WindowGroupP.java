@@ -53,15 +53,20 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
+import static java.util.stream.Collectors.toList;
 
 public class WindowGroupP<K, V> extends AbstractProcessor {
 
-    private static final Object NULL = new Object();
+    private static final int PROCESSING_TIME_MIN_INCREMENT = 100;
+
+    private static final Object COMPLETE_MARKER = new Object();
+    private static final Object TRY_PROCESS_MARKER = new Object();
 
     private final SerializablePipelineOptions pipelineOptions;
     private final Coder<V> inputValueValueCoder;
@@ -74,6 +79,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
     private final String ownerId; //do not remove, useful for debugging
 
     private Instant latestWatermark = BoundedWindow.TIMESTAMP_MIN_VALUE;
+    private long lastProcessingTime = System.currentTimeMillis();
 
     private WindowGroupP(
             SerializablePipelineOptions pipelineOptions,
@@ -91,9 +97,17 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
 
         this.flatMapper = flatMapper(
                 item -> {
-                    if (NULL == item) {
-                        //do nothing
+                    if (COMPLETE_MARKER == item) {
+                        long millis = BoundedWindow.TIMESTAMP_MAX_VALUE.getMillis();
+                        advanceWatermark(millis);
+                    } else if (TRY_PROCESS_MARKER == item) {
+                        Instant now = Instant.now();
+                        if (now.getMillis() - lastProcessingTime > PROCESSING_TIME_MIN_INCREMENT) {
+                            lastProcessingTime = now.getMillis();
+                            advanceProcessingTime(now);
+                        }
                     } else if (item instanceof Watermark) {
+                        advanceWatermark(((Watermark) item).timestamp());
                         appendableTraverser.append(item);
                     } else {
                         WindowedValue<KV<K, V>> windowedValue = Utils.decodeWindowedValue((byte[]) item, inputCoder);
@@ -101,8 +115,8 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                         K key = kv.getKey();
                         V value = kv.getValue();
                         WindowedValue<V> updatedWindowedValue = WindowedValue.of(value, windowedValue.getTimestamp(), windowedValue.getWindows(), windowedValue.getPane());
-                        KeyManager keyManager = keyManagers.computeIfAbsent(key, k -> new KeyManager(k, latestWatermark));
-                        keyManager.processElement(updatedWindowedValue);
+                        keyManagers.computeIfAbsent(key, KeyManager::new)
+                                   .processElement(updatedWindowedValue);
                     }
                     return appendableTraverser;
                 }
@@ -122,26 +136,37 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
     }
 
     @Override
+    public boolean tryProcess() {
+        return flatMapper.tryProcess(TRY_PROCESS_MARKER);
+    }
+
+    @Override
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
         return flatMapper.tryProcess(item);
     }
 
     @Override
     public boolean tryProcessWatermark(@Nonnull Watermark watermark) {
-        advanceWatermark(watermark.timestamp());
         return flatMapper.tryProcess(watermark);
     }
 
     @Override
     public boolean complete() {
-        long millis = BoundedWindow.TIMESTAMP_MAX_VALUE.getMillis();
-        advanceWatermark(millis);
-        return flatMapper.tryProcess(NULL);
+        return flatMapper.tryProcess(COMPLETE_MARKER);
     }
 
     private void advanceWatermark(long millis) {
         this.latestWatermark = new Instant(millis);
-        this.keyManagers.values().forEach(m -> m.advanceWatermark(latestWatermark));
+        Instant now = Instant.now();
+        for (KeyManager m : keyManagers.values()) {
+            m.advanceWatermark(latestWatermark, now);
+        }
+    }
+
+    private void advanceProcessingTime(Instant now) {
+        for (KeyManager m : keyManagers.values()) {
+            m.advanceProcessingTime(now);
+        }
     }
 
     private static class InMemoryStateInternalsImpl extends InMemoryStateInternals {
@@ -170,7 +195,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
         private final InMemoryStateInternalsImpl stateInternals;
         private final ReduceFnRunner<K, V, Iterable<V>, BoundedWindow> reduceFnRunner;
 
-        KeyManager(K key, Instant currentWaterMark) {
+        KeyManager(K key) {
             this.timerInternals = new InMemoryTimerInternals();
             this.stateInternals = new InMemoryStateInternalsImpl(key);
             this.reduceFnRunner = new ReduceFnRunner<>(
@@ -205,12 +230,12 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                     SystemReduceFn.buffering(inputValueValueCoder),
                     pipelineOptions.get()
             );
-            advanceWatermark(currentWaterMark);
+            advanceWatermark(latestWatermark, Instant.now());
         }
 
-        void advanceWatermark(Instant watermark) {
+        void advanceWatermark(Instant watermark, Instant now) {
             try {
-                timerInternals.advanceProcessingTime(Instant.now());
+                timerInternals.advanceProcessingTime(now);
                 advanceInputWatermark(watermark);
                 Instant hold = stateInternals.earliestWatermarkHold();
                 if (hold == null) {
@@ -220,6 +245,15 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                     hold = timerInternals.currentInputWatermarkTime();
                 }
                 advanceOutputWatermark(hold);
+                reduceFnRunner.persist();
+            } catch (Exception e) {
+                throw rethrow(e);
+            }
+        }
+
+        void advanceProcessingTime(Instant now) {
+            try {
+                timerInternals.advanceProcessingTime(now);
                 reduceFnRunner.persist();
             } catch (Exception e) {
                 throw rethrow(e);
@@ -259,13 +293,19 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
         }
 
         private Collection<? extends BoundedWindow> dropLateWindows(Collection<? extends BoundedWindow> windows) {
-            List<BoundedWindow> filteredWindows = new ArrayList<>(windows.size()); //todo: reduce garbage, most of the time it will be one window only and there won't be expired windows
-            for (BoundedWindow window : windows) {
-                if (!isExpiredWindow(window)) {
-                    filteredWindows.add(window);
+            boolean hasExpired = false;
+            for (Iterator<? extends BoundedWindow> iterator = windows.iterator(); !hasExpired && iterator.hasNext(); ) {
+                if (isExpiredWindow(iterator.next())) {
+                    hasExpired = true;
                 }
             }
-            return filteredWindows;
+            if (!hasExpired) {
+                return windows;
+            }
+            // if there are expired items, return a filtered collection
+            return windows.stream()
+                   .filter(window -> !isExpiredWindow(window))
+                   .collect(toList());
         }
 
         private boolean isExpiredWindow(BoundedWindow window) {
