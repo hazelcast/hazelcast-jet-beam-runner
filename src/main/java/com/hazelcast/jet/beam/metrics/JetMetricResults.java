@@ -41,13 +41,17 @@ import java.util.Map;
 
 public class JetMetricResults extends MetricResults implements EntryAddedListener<String, MetricUpdates>, MapClearedListener {
 
-    private final Map<MetricKey, Long> counters = new HashMap<>();
-    private final Map<MetricKey, DistributionData> distributions = new HashMap<>();
-    private final Map<MetricKey, GaugeData> gauges = new HashMap<>();
+
+    private final Counters counters = new Counters();
+    private final Distributions distributions = new Distributions();
+    private final Gauges gauges = new Gauges();
 
     @Override
     public void entryAdded(EntryEvent<String, MetricUpdates> event) {
-        merge(event.getValue());
+        MetricUpdates metricUpdates = event.getValue();
+        counters.merge(metricUpdates.counterUpdates());
+        distributions.merge(metricUpdates.distributionUpdates());
+        gauges.merge(metricUpdates.gaugeUpdates());
     }
 
     @Override
@@ -57,37 +61,9 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
         gauges.clear();
     }
 
-    private void merge(MetricUpdates metricUpdates) {
-        mergeCounters(metricUpdates.counterUpdates());
-        mergeDistributions(metricUpdates.distributionUpdates());
-        mergeGauges(metricUpdates.gaugeUpdates());
-    }
-
-    private void mergeGauges(Iterable<MetricUpdate<GaugeData>> updates) {
-        for (MetricUpdate<GaugeData> update : updates) {
-            MetricKey key = normalizeStepName(update.getKey());
-            GaugeData oldGauge = gauges.getOrDefault(key, GaugeData.empty());
-            GaugeData updatedGauge = update.getUpdate().combine(oldGauge);
-            gauges.put(key, updatedGauge);
-        }
-    }
-
-    private void mergeDistributions(Iterable<MetricUpdate<DistributionData>> updates) {
-        for (MetricUpdate<DistributionData> update : updates) {
-            MetricKey key = normalizeStepName(update.getKey());
-            DistributionData oldDistribution = distributions.getOrDefault(key, DistributionData.EMPTY);
-            DistributionData updatedDistribution = update.getUpdate().combine(oldDistribution);
-            distributions.put(key, updatedDistribution);
-        }
-    }
-
-    private void mergeCounters(Iterable<MetricUpdate<Long>> updates) {
-        for (MetricUpdate<Long> update : updates) {
-            MetricKey key = normalizeStepName(update.getKey());
-            Long oldValue = counters.getOrDefault(key, 0L);
-            Long updatedValue = oldValue + update.getUpdate();
-            counters.put(key, updatedValue);
-        }
+    @Override
+    public MetricQueryResults queryMetrics(@Nullable MetricsFilter filter) {
+        return new QueryResults(filter);
     }
 
     private static MetricKey normalizeStepName(MetricKey key) {
@@ -97,9 +73,8 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
         );
     }
 
-    @Override
-    public MetricQueryResults queryMetrics(@Nullable MetricsFilter filter) {
-        return new QueryResults(filter);
+    private static Predicate<Map.Entry<MetricKey, ?>> matchesFilter(final MetricsFilter filter) {
+        return entry -> MetricFiltering.matches(filter, entry.getKey());
     }
 
     private class QueryResults extends MetricQueryResults {
@@ -111,48 +86,122 @@ public class JetMetricResults extends MetricResults implements EntryAddedListene
 
         @Override
         public Iterable<MetricResult<Long>> getCounters() {
+            return counters.filter(filter);
+        }
+
+        @Override
+        public Iterable<MetricResult<DistributionResult>> getDistributions() {
+            return distributions.filter(filter);
+        }
+
+        @Override
+        public Iterable<MetricResult<GaugeResult>> getGauges() {
+            return gauges.filter(filter);
+        }
+    }
+
+    /**
+     * Thread-safe storage of gathered counters
+     */
+    private static class Counters {
+
+        private final Map<MetricKey, Long> counters = new HashMap<>();
+
+        synchronized void merge(Iterable<MetricUpdate<Long>> updates) {
+            for (MetricUpdate<Long> update : updates) {
+                MetricKey key = normalizeStepName(update.getKey());
+                Long oldValue = counters.getOrDefault(key, 0L);
+                Long updatedValue = oldValue + update.getUpdate();
+                counters.put(key, updatedValue);
+            }
+        }
+
+        synchronized void clear() {
+            counters.clear();
+        }
+
+        synchronized Iterable<MetricResult<Long>> filter(MetricsFilter filter) {
             return FluentIterable.from(counters.entrySet())
                     .filter(matchesFilter(filter))
-                    .transform(this::counterUpdateToResult)
+                    .transform(this::toUpdateResult)
                     .toList();
         }
 
-        private MetricResult<Long> counterUpdateToResult(Map.Entry<MetricKey, Long> entry) {
+        private MetricResult<Long> toUpdateResult(Map.Entry<MetricKey, Long> entry) {
             MetricKey key = entry.getKey();
             Long counter = entry.getValue();
             return MetricResult.create(key, counter, counter);
         }
 
-        @Override
-        public Iterable<MetricResult<DistributionResult>> getDistributions() {
+    }
+
+    /**
+     * Thread-safe storage of gathered distributions
+     */
+    private static class Distributions {
+
+        private final Map<MetricKey, DistributionData> distributions = new HashMap<>();
+
+        synchronized void merge(Iterable<MetricUpdate<DistributionData>> updates) {
+            for (MetricUpdate<DistributionData> update : updates) {
+                MetricKey key = normalizeStepName(update.getKey());
+                DistributionData oldDistribution = distributions.getOrDefault(key, DistributionData.EMPTY);
+                DistributionData updatedDistribution = update.getUpdate().combine(oldDistribution);
+                distributions.put(key, updatedDistribution);
+            }
+        }
+
+        synchronized void clear() {
+            distributions.clear();
+        }
+
+        synchronized Iterable<MetricResult<DistributionResult>> filter(MetricsFilter filter) {
             return FluentIterable.from(distributions.entrySet())
                     .filter(matchesFilter(filter))
-                    .transform(this::distributionUpdateToResult)
+                    .transform(this::toUpdateResult)
                     .toList();
         }
 
-        private MetricResult<DistributionResult> distributionUpdateToResult(Map.Entry<MetricKey, DistributionData> entry) {
+        private MetricResult<DistributionResult> toUpdateResult(Map.Entry<MetricKey, DistributionData> entry) {
             MetricKey key = entry.getKey();
             DistributionResult distributionResult = entry.getValue().extractResult();
             return MetricResult.create(key, distributionResult, distributionResult);
         }
 
-        @Override
-        public Iterable<MetricResult<GaugeResult>> getGauges() {
+    }
+
+    /**
+     * Thread-safe storage of gathered gauges
+     */
+    private static class Gauges {
+
+        private final Map<MetricKey, GaugeData> gauges = new HashMap<>();
+
+        synchronized void merge(Iterable<MetricUpdate<GaugeData>> updates) {
+            for (MetricUpdate<GaugeData> update : updates) {
+                MetricKey key = normalizeStepName(update.getKey());
+                GaugeData oldGauge = gauges.getOrDefault(key, GaugeData.empty());
+                GaugeData updatedGauge = update.getUpdate().combine(oldGauge);
+                gauges.put(key, updatedGauge);
+            }
+        }
+
+        synchronized void clear() {
+            gauges.clear();
+        }
+
+        synchronized Iterable<MetricResult<GaugeResult>> filter(MetricsFilter filter) {
             return FluentIterable.from(gauges.entrySet())
                     .filter(matchesFilter(filter))
-                    .transform(this::gaugeUpdateToResult)
+                    .transform(this::toUpdateResult)
                     .toList();
         }
 
-        private MetricResult<GaugeResult> gaugeUpdateToResult(Map.Entry<MetricKey, GaugeData> entry) {
+        private MetricResult<GaugeResult> toUpdateResult(Map.Entry<MetricKey, GaugeData> entry) {
             MetricKey key = entry.getKey();
             GaugeResult gaugeResult = entry.getValue().extractResult();
             return MetricResult.create(key, gaugeResult, gaugeResult);
         }
 
-        private Predicate<Map.Entry<MetricKey, ?>> matchesFilter(final MetricsFilter filter) {
-            return entry -> MetricFiltering.matches(filter, entry.getKey());
-        }
     }
 }
