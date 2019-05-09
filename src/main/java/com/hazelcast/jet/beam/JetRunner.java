@@ -29,6 +29,7 @@ import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.PipelineRunner;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.runners.PTransformOverride;
+import org.apache.beam.sdk.transforms.PTransform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,9 +54,12 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
     private final JetPipelineOptions options;
     private final Function<ClientConfig, JetInstance> jetClientSupplier;
 
+    private Function<PTransform<?, ?>,  JetTransformTranslator<?>> translatorProvider;
+
     private JetRunner(PipelineOptions options, Function<ClientConfig, JetInstance> jetClientSupplier) {
         this.options = validate(options.as(JetPipelineOptions.class));
         this.jetClientSupplier = jetClientSupplier;
+        this.translatorProvider = JetTransformTranslators::getTranslator;
     }
 
     @Override
@@ -72,6 +76,17 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
                 Jet.shutdownAll();
             }
         }
+    }
+
+    void addExtraTranslators(Function<PTransform<?, ?>, JetTransformTranslator<?>> extraTranslatorProvider) {
+        Function<PTransform<?, ?>, JetTransformTranslator<?>> initialTranslatorProvider = this.translatorProvider;
+        this.translatorProvider = transform -> {
+            JetTransformTranslator<?> translator = initialTranslatorProvider.apply(transform);
+            if (translator == null) {
+                translator = extraTranslatorProvider.apply(transform);
+            }
+            return translator;
+        };
     }
 
     private PipelineResult runInternal(Pipeline pipeline) {
@@ -102,7 +117,7 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         //Set<ExecutableStage> fusedStages = GreedyPipelineFuser.fuse(PipelineTranslation.toProto(pipeline)).getFusedStages();
         //System.out.println("Pipeline fused into " + fusedStages.size() + " stages"); //todo: remove
 
-        JetGraphVisitor graphVisitor = new JetGraphVisitor(options);
+        JetGraphVisitor graphVisitor = new JetGraphVisitor(options, translatorProvider);
         pipeline.traverseTopologically(graphVisitor);
         return graphVisitor.getDAG();
     }
@@ -147,5 +162,4 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
 
         return options;
     }
-
 }

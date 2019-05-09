@@ -22,7 +22,6 @@ import com.hazelcast.jet.beam.processors.FlattenP;
 import com.hazelcast.jet.beam.processors.ImpulseP;
 import com.hazelcast.jet.beam.processors.ParDoP;
 import com.hazelcast.jet.beam.processors.StatefulParDoP;
-import com.hazelcast.jet.beam.processors.TestStreamP;
 import com.hazelcast.jet.beam.processors.UnboundedSourceP;
 import com.hazelcast.jet.beam.processors.ViewP;
 import com.hazelcast.jet.beam.processors.WindowGroupP;
@@ -41,7 +40,6 @@ import org.apache.beam.sdk.io.BoundedSource;
 import org.apache.beam.sdk.io.UnboundedSource;
 import org.apache.beam.sdk.runners.AppliedPTransform;
 import org.apache.beam.sdk.runners.TransformHierarchy.Node;
-import org.apache.beam.sdk.testing.TestStream;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.DoFnSchemaInformation;
 import org.apache.beam.sdk.transforms.PTransform;
@@ -80,7 +78,6 @@ class JetTransformTranslators {
         TRANSLATORS.put(PTransformTranslation.FLATTEN_TRANSFORM_URN, new FlattenTranslator());
         TRANSLATORS.put(PTransformTranslation.ASSIGN_WINDOWS_TRANSFORM_URN, new WindowTranslator());
         TRANSLATORS.put(PTransformTranslation.IMPULSE_TRANSFORM_URN, new ImpulseTranslator());
-        TRANSLATORS.put(PTransformTranslation.TEST_STREAM_TRANSFORM_URN, new TestStreamTranslator());
     }
 
     static JetTransformTranslator<?> getTranslator(PTransform<?, ?> transform) {
@@ -357,27 +354,6 @@ class JetTransformTranslators {
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
             Vertex vertex = dagBuilder.addVertex(vertexId, ImpulseP.supplier(vertexId));
-
-            String outputEdgeId = Utils.getTupleTagId(output.getValue());
-            dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());
-            dagBuilder.registerEdgeStartPoint(outputEdgeId, vertex, outputCoder);
-            return vertex;
-        }
-    }
-
-    private static class TestStreamTranslator<T> implements JetTransformTranslator<PTransform<PBegin, PCollection<T>>> {
-        @Override
-        public Vertex translate(Pipeline pipeline, AppliedPTransform<?, ?, ?> appliedTransform, Node node, JetTranslationContext context) {
-            String transformName = appliedTransform.getFullName();
-            DAGBuilder dagBuilder = context.getDagBuilder();
-            String vertexId = dagBuilder.newVertexId(transformName);
-
-            TestStream<T> transform = (TestStream<T>) appliedTransform.getTransform();
-
-            // events in the transform are not serializable, we have to translate them. We'll also flatten the collection.
-            Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
-            Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
-            Vertex vertex = dagBuilder.addVertex(vertexId, TestStreamP.supplier(transform.getEvents(), outputCoder));
 
             String outputEdgeId = Utils.getTupleTagId(output.getValue());
             dagBuilder.registerCollectionOfEdge(outputEdgeId, output.getKey().getId());

@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package com.hazelcast.jet.beam.processors;
+package com.hazelcast.jet.beam;
 
 import com.hazelcast.jet.Traverser;
-import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;

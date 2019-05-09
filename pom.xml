@@ -90,6 +90,7 @@
             <groupId>org.apache.beam</groupId>
             <artifactId>beam-runners-core-java</artifactId>
             <version>${apache.beam.version}</version>
+            <scope>compile</scope>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/com.google.auto.service/auto-service -->
