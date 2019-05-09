@@ -185,7 +185,7 @@ public class DAGBuilder {
         @Override
         public Object applyEx(byte[] b) throws Exception {
             Object t = CoderUtils.decodeFromByteArray(coder, b); //todo: decoding twice....
-            Object key = null;
+            Object key;
             if (t instanceof WindowedValue) {
                 t = ((WindowedValue) t).getValue();
             }

@@ -23,7 +23,6 @@ import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;
 import com.hazelcast.jet.core.Watermark;
-import com.hazelcast.jet.core.processor.Processors;
 import com.hazelcast.nio.Address;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
@@ -34,21 +33,19 @@ import org.joda.time.Instant;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 
-import static com.hazelcast.jet.beam.Utils.roundRobinSubList;
 import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 
 public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> extends AbstractProcessor implements Traverser {
 
     private static final Instant INSTANT_ZERO = new Instant(0);
 
-    private final UnboundedSource.UnboundedReader<T>[] readers;
-    private final Instant[] watermarks;
+    private UnboundedSource.UnboundedReader<T>[] readers;
+    private Instant[] watermarks;
+    private final List<? extends UnboundedSource<T, CMT>> allShards;
     private final PipelineOptions options;
     private final Coder outputCoder;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
@@ -57,19 +54,19 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
     private int currentReaderIndex;
     private long lastSentWatermark;
 
-    UnboundedSourceP(List<UnboundedSource<T, CMT>> shards, PipelineOptions options, Coder outputCoder, String ownerId) {
-        if (shards == null || shards.isEmpty()) {
-            throw new IllegalArgumentException();
-        }
-        this.readers = createReaders(shards, options);
-        this.watermarks = initWatermarks(shards.size());
+    private UnboundedSourceP(List<? extends UnboundedSource<T, CMT>> allShards, PipelineOptions options, Coder outputCoder, String ownerId) {
+        this.allShards = allShards;
         this.options = options;
         this.outputCoder = outputCoder;
         this.ownerId = ownerId;
     }
 
     @Override
-    protected void init(@Nonnull Processor.Context context)  {
+    protected void init(@Nonnull Processor.Context context) {
+        List<? extends UnboundedSource<T, CMT>> myShards =
+                Utils.roundRobinSubList(allShards, context.globalProcessorIndex(), context.totalParallelism());
+        this.readers = createReaders(myShards, options);
+        this.watermarks = initWatermarks(myShards.size());
         Arrays.stream(readers).forEach(UnboundedSourceP::startReader);
         currentReaderIndex = 0;
         lastSentWatermark = 0;
@@ -80,8 +77,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         Instant minWatermark = getMin(watermarks);
         if (minWatermark.isAfter(lastSentWatermark)) {
             lastSentWatermark = minWatermark.getMillis();
-            Watermark watermark = new Watermark(lastSentWatermark);
-            return watermark;
+            return new Watermark(lastSentWatermark);
         }
 
         try {
@@ -112,6 +108,9 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
 
     @Override
     public boolean complete() {
+        if (readers.length == 0) {
+            return true;
+        }
         return emitFromTraverser(this);
     }
 
@@ -126,7 +125,9 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         Arrays.fill(readers, null);
     }
 
-    private static <T, CMT extends UnboundedSource.CheckpointMark> UnboundedSource.UnboundedReader<T>[] createReaders(List<UnboundedSource<T, CMT>> shards, PipelineOptions options) {
+    @SuppressWarnings("unchecked")
+    private static <T, CMT extends UnboundedSource.CheckpointMark> UnboundedSource.UnboundedReader<T>[] createReaders(
+            List<? extends UnboundedSource<T, CMT>> shards, PipelineOptions options) {
         return shards.stream()
                 .map(shard -> createReader(options, shard))
                 .toArray(UnboundedSource.UnboundedReader[]::new);
@@ -163,10 +164,10 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
     }
 
     private static Instant getMin(Instant[] instants) {
-        Instant min = null;
-        for (Instant instant : instants) {
-            if (min == null || instant.isBefore(min)) {
-                min = instant;
+        Instant min = instants[0];
+        for (int i = 1; i < instants.length; i++) {
+            if (instants[i].isBefore(min)) {
+                min = instants[i];
             }
         }
         return min;
@@ -188,7 +189,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         private final Coder outputCoder;
         private final String ownerId;
 
-        private transient List<? extends UnboundedSource<T, CMT>> shards;
+        private List<? extends UnboundedSource<T, CMT>> shards;
 
         private UnboundedSourceMetaProcessorSupplier(
                 UnboundedSource<T, CMT> unboundedSource,
@@ -210,51 +211,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         @Nonnull
         @Override
         public Function<? super Address, ? extends ProcessorSupplier> get(@Nonnull List<Address> addresses) {
-            return address -> new UnboundedSourceProcessorSupplier(
-                    roundRobinSubList(shards, addresses.indexOf(address), addresses.size()),
-                    options,
-                    outputCoder,
-                    ownerId
-            );
+            return address -> ProcessorSupplier.of(() -> new UnboundedSourceP<>(shards, options.get(), outputCoder, ownerId));
         }
     }
-
-    private static class UnboundedSourceProcessorSupplier<T, CMT extends UnboundedSource.CheckpointMark> implements ProcessorSupplier {
-        private final List<UnboundedSource<T, CMT>> shards;
-        private final SerializablePipelineOptions options;
-        private final Coder outputCoder;
-        private final String ownerId;
-        private transient ProcessorSupplier.Context context;
-
-        private UnboundedSourceProcessorSupplier(
-                List<UnboundedSource<T, CMT>> shards,
-                SerializablePipelineOptions options,
-                Coder outputCoder,
-                String ownerId
-        ) {
-            this.shards = shards;
-            this.options = options;
-            this.outputCoder = outputCoder;
-            this.ownerId = ownerId;
-        }
-
-        @Override
-        public void init(@Nonnull Context context) {
-            this.context = context;
-        }
-
-        @Nonnull
-        @Override
-        public Collection<? extends Processor> get(int count) {
-            int indexBase = context.memberIndex() * context.localParallelism();
-            List<Processor> res = new ArrayList<>(count);
-            for (int i = 0; i < count; i++, indexBase++) {
-                List<UnboundedSource<T, CMT>> shards = roundRobinSubList(this.shards, i, count);
-                Processor processor = shards.isEmpty() ? Processors.noopP().get() : new UnboundedSourceP<>(shards, options.get(), outputCoder, ownerId);
-                res.add(processor);
-            }
-            return res;
-        }
-    }
-
 }

@@ -37,6 +37,7 @@ import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
 import org.apache.beam.vendor.guava.v20_0.com.google.common.collect.Iterables;
 
+import javax.annotation.Nonnull;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -200,7 +201,8 @@ public class Utils {
      *   2, 5
      * </pre>
      */
-    public static <E> List<E> roundRobinSubList(List<E> list, int index, int count) {
+    @Nonnull
+    public static <E> List<E> roundRobinSubList(@Nonnull List<E> list, int index, int count) {
         if (index < 0 || index >= count) {
             throw new IllegalArgumentException("index=" + index + ", count=" + count);
         }
