@@ -117,7 +117,6 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
             PipelineResult.State state = pipeline.run().waitUntilFinish();
-        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -133,7 +132,6 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
             PipelineResult.State state = pipeline.run().waitUntilFinish();
-        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -149,7 +147,6 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
             PipelineResult.State state = pipeline.run().waitUntilFinish();
-        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -165,7 +162,6 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
             PipelineResult.State state = pipeline.run().waitUntilFinish();
-        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -181,7 +177,6 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
             PipelineResult.State state = pipeline.run().waitUntilFinish();
-        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -197,7 +192,6 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
             PipelineResult.State state = pipeline.run().waitUntilFinish();
-        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(
@@ -213,7 +207,6 @@ public class LifecycleParDoTest extends AbstractParDoTest {
         pipeline.apply(Create.of(1, 2, 3)).apply(ParDo.of(fn));
         try {
             PipelineResult.State state = pipeline.run().waitUntilFinish();
-        assertEquals(PipelineResult.State.DONE, state);
             fail("Pipeline should have failed with an exception");
         } catch (Exception e) {
             assertThat(

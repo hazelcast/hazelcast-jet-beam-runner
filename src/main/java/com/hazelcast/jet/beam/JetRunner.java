@@ -128,16 +128,9 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(METRICS_ACCUMULATOR_NAME);
         metricsAccumulator.clear();
         Job job = jet.newJob(dag);
+        job.getFuture().whenComplete((r, f) -> jet.shutdown());
 
-        JetPipelineResult result = new JetPipelineResult(metricsAccumulator);
-        result.setJob(job);
-
-        job.join();
-        result.setJob(null);
-        job.cancel();
-        jet.shutdown();
-
-        return result;
+        return new JetPipelineResult(job, metricsAccumulator);
     }
 
     private JetInstance getJetInstance(JetPipelineOptions options) {
