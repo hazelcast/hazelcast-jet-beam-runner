@@ -46,7 +46,7 @@ public class FlattenP extends AbstractProcessor {
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
         Coder inputCoder = inputOrdinalCoders.get(ordinal);
         WindowedValue<Object> windowedValue = Utils.decodeWindowedValue((byte[]) item, inputCoder);
-        return tryEmit(Utils.encodeWindowedValue(windowedValue, outputCoder));
+        return tryEmit(Utils.encode(windowedValue, outputCoder));
     }
 
     public static final class Supplier implements SupplierEx<Processor>, DAGBuilder.WiringListener {

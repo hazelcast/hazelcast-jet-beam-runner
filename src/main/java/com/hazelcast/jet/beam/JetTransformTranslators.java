@@ -45,6 +45,7 @@ import org.apache.beam.sdk.transforms.DoFnSchemaInformation;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.util.WindowedValue;
+import org.apache.beam.sdk.util.WindowedValue.WindowedValueCoder;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PBegin;
 import org.apache.beam.sdk.values.PCollection;
@@ -238,8 +239,7 @@ class JetTransformTranslators {
             String transformName = appliedTransform.getFullName();
 
             PCollection<KV<K, InputT>> input = Utils.getInput(appliedTransform);
-            Coder inputCoder = Utils.getCoder(input);
-            Coder inputValueCoder = ((PCollection) Utils.getInput(appliedTransform)).getCoder();
+            WindowedValueCoder<KV<K, InputT>> inputCoder = Utils.getWindowedValueCoder(input);
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
 
@@ -247,7 +247,7 @@ class JetTransformTranslators {
 
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
-            Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(context.getOptions(), inputValueCoder, inputCoder, outputCoder, windowingStrategy, vertexId));
+            Vertex vertex = dagBuilder.addVertex(vertexId, WindowGroupP.supplier(context.getOptions(), inputCoder, outputCoder, windowingStrategy, vertexId));
 
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
 

@@ -307,8 +307,8 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
         @Override
         public <T> void output(TupleTag<T> tag, WindowedValue<T> outputValue) {
             assert currentBucket == 0 && currentItem == 0 : "adding output while flushing";
-            Coder<?> coder = outputCoders.get(tag);
-            byte[] output = Utils.encodeWindowedValue(outputValue, coder);
+            Coder coder = outputCoders.get(tag);
+            byte[] output = Utils.encode(outputValue, coder);
             for (int ordinal : outputCollToOrdinals.get(tag)) {
                 outputBuckets[ordinal].add(output);
             }

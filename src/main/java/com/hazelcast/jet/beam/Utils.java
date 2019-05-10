@@ -30,6 +30,7 @@ import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.reflect.DoFnSignatures;
 import org.apache.beam.sdk.util.CoderUtils;
 import org.apache.beam.sdk.util.WindowedValue;
+import org.apache.beam.sdk.util.WindowedValue.WindowedValueCoder;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.PValue;
@@ -43,6 +44,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -117,8 +119,12 @@ public class Utils {
         if (pCollection.getWindowingStrategy() == null) {
             return pCollection.getCoder();
         } else {
-            return WindowedValue.FullWindowedValueCoder.of(pCollection.getCoder(), pCollection.getWindowingStrategy().getWindowFn().windowCoder());
+            return getWindowedValueCoder(pCollection);
         }
+    }
+
+    static <T> WindowedValueCoder<T> getWindowedValueCoder(PCollection<T> pCollection) {
+        return WindowedValue.FullWindowedValueCoder.of(pCollection.getCoder(), pCollection.getWindowingStrategy().getWindowFn().windowCoder());
     }
 
     static <T> Map<T, Coder> getCoders(Map<TupleTag<?>, PValue> pCollections, Function<Map.Entry<TupleTag<?>, PValue>, T> tupleTagExtractor) {
@@ -231,9 +237,9 @@ public class Utils {
         }
     }
 
-    public static <T> byte[] encodeWindowedValue(WindowedValue<T> windowedValue, Coder coder) {
+    public static <T> byte[] encode(T value, Coder<T> coder) {
         try {
-            return CoderUtils.encodeToByteArray(coder, windowedValue);
+            return CoderUtils.encodeToByteArray(coder, value);
         } catch (IOException e) {
             throw rethrow(e);
         }
@@ -252,5 +258,37 @@ public class Utils {
                 ListCoder.of(elementCoder.getValueCoder()),
                 elementCoder.getWindowCoder()
         );
+    }
+
+    /**
+     * A wrapper of {@code byte[]} that can be used as a hash-map key.
+     */
+    public static class ByteArrayKey {
+        private final byte[] value;
+        private int hash;
+
+        public ByteArrayKey(@Nonnull byte[] value) {
+            this.value = value;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            ByteArrayKey that = (ByteArrayKey) o;
+            return Arrays.equals(value, that.value);
+        }
+
+        @Override
+        public int hashCode() {
+            if (hash == 0) {
+                hash = Arrays.hashCode(value);
+            }
+            return hash;
+        }
     }
 }

@@ -24,8 +24,10 @@ import com.hazelcast.jet.core.Vertex;
 import com.hazelcast.jet.function.FunctionEx;
 import com.hazelcast.jet.function.SupplierEx;
 import org.apache.beam.sdk.coders.Coder;
+import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.util.CoderUtils;
 import org.apache.beam.sdk.util.WindowedValue;
+import org.apache.beam.sdk.util.WindowedValue.WindowedValueCoder;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollectionView;
 
@@ -182,27 +184,18 @@ public class DAGBuilder {
         void isInboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId);
     }
 
-    private static class PartitionedKeyExtractor implements FunctionEx<byte[], Object> {
-        private final Coder coder;
+    private static class PartitionedKeyExtractor<K, V> implements FunctionEx<byte[], Object> {
+        private final WindowedValueCoder<KV<K, V>> coder;
 
         PartitionedKeyExtractor(Coder coder) {
-            this.coder = coder;
+            this.coder = (WindowedValueCoder<KV<K, V>>) coder;
         }
 
         @Override
         public Object applyEx(byte[] b) throws Exception {
-            Object t = CoderUtils.decodeFromByteArray(coder, b); //todo: decoding twice....
-            Object key;
-            if (t instanceof WindowedValue) {
-                t = ((WindowedValue) t).getValue();
-            }
-            if (t instanceof KV) {
-                key = ((KV) t).getKey();
-            } else {
-                throw new RuntimeException("Oops!");
-            }
-            return key == null ? "null" : key;
+            WindowedValue<KV<K, V>> windowedValue = CoderUtils.decodeFromByteArray(coder, b); //todo: decoding twice....
+            KvCoder<K, V> kvCoder = (KvCoder<K, V>) coder.getValueCoder();
+            return CoderUtils.encodeToByteArray(kvCoder.getKeyCoder(), windowedValue.getValue().getKey());
         }
     }
-
 }

@@ -90,7 +90,7 @@ public class ViewP extends AbstractProcessor {
                                         Collections.singleton(e.getKey()),
                                         e.getValue().pane
                                 );
-                                return Utils.encodeWindowedValue(outputValue, outputCoder);
+                                return Utils.encode(outputValue, outputCoder);
                             }
                     )
             );

@@ -17,6 +17,7 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.beam.Utils;
+import com.hazelcast.jet.beam.Utils.ByteArrayKey;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.AppendableTraverser;
 import com.hazelcast.jet.core.Processor;
@@ -42,6 +43,7 @@ import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
 import org.apache.beam.sdk.util.WindowTracing;
 import org.apache.beam.sdk.util.WindowedValue;
+import org.apache.beam.sdk.util.WindowedValue.WindowedValueCoder;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.WindowingStrategy;
@@ -72,7 +74,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
     private final Coder<V> inputValueValueCoder;
     private final Coder outputCoder;
     private final WindowingStrategy<V, BoundedWindow> windowingStrategy;
-    private final Map<K, KeyManager> keyManagers = new HashMap<>();
+    private final Map<ByteArrayKey, KeyManager> keyManagers = new HashMap<>();
     private final AppendableTraverser<Object> appendableTraverser = new AppendableTraverser<>(128); //todo: right capacity?
     private final FlatMapper<Object, Object> flatMapper;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
@@ -83,14 +85,14 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
 
     private WindowGroupP(
             SerializablePipelineOptions pipelineOptions,
-            Coder inputCoder,
-            Coder inputValueCoder,
+            WindowedValueCoder<KV<K, V>> inputCoder,
             Coder outputCoder,
             WindowingStrategy<V, BoundedWindow> windowingStrategy,
             String ownerId
     ) {
         this.pipelineOptions = pipelineOptions;
-        this.inputValueValueCoder = ((KvCoder<K, V>) inputValueCoder).getValueCoder();
+        KvCoder<K, V> inputValueCoder = (KvCoder<K, V>) inputCoder.getValueCoder();
+        this.inputValueValueCoder = inputValueCoder.getValueCoder();
         this.outputCoder = outputCoder;
         this.windowingStrategy = windowingStrategy;
         this.ownerId = ownerId;
@@ -114,8 +116,9 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                         KV<K, V> kv = windowedValue.getValue();
                         K key = kv.getKey();
                         V value = kv.getValue();
+                        ByteArrayKey keyBytes = new ByteArrayKey(Utils.encode(key, inputValueCoder.getKeyCoder()));
                         WindowedValue<V> updatedWindowedValue = WindowedValue.of(value, windowedValue.getTimestamp(), windowedValue.getWindows(), windowedValue.getPane());
-                        keyManagers.computeIfAbsent(key, KeyManager::new)
+                        keyManagers.computeIfAbsent(keyBytes, x -> new KeyManager(key))
                                    .processElement(updatedWindowedValue);
                     }
                     return appendableTraverser;
@@ -124,15 +127,14 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
     }
 
     @SuppressWarnings("unchecked")
-    public static SupplierEx<Processor> supplier(
+    public static <K, V> SupplierEx<Processor> supplier(
             SerializablePipelineOptions pipelineOptions,
-            Coder inputValueCoder,
-            Coder inputCoder,
+            WindowedValueCoder<KV<K, V>> inputCoder,
             Coder outputCoder,
             WindowingStrategy windowingStrategy,
             String ownerId
     ) {
-        return () -> new WindowGroupP<>(pipelineOptions, inputCoder, inputValueCoder, outputCoder, windowingStrategy, ownerId);
+        return () -> new WindowGroupP<>(pipelineOptions, inputCoder, outputCoder, windowingStrategy, ownerId);
     }
 
     @Override
@@ -210,7 +212,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                         @Override
                         public void outputWindowedValue(KV<K, Iterable<V>> output, Instant timestamp, Collection<? extends BoundedWindow> windows, PaneInfo pane) {
                             WindowedValue<KV<K, Iterable<V>>> windowedValue = WindowedValue.of(output, timestamp, windows, pane);
-                            byte[] encodedValue = Utils.encodeWindowedValue(windowedValue, outputCoder);
+                            byte[] encodedValue = Utils.encode(windowedValue, outputCoder);
                             //noinspection ResultOfMethodCallIgnored
                             appendableTraverser.append(encodedValue);
                         }

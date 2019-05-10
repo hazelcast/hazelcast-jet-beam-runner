@@ -54,7 +54,7 @@ public class TestStreamP extends AbstractProcessor {
                     } else {
                         assert event instanceof SerializableTimestampedValue;
                         WindowedValue windowedValue = ((SerializableTimestampedValue) event).asWindowedValue();
-                        return Utils.encodeWindowedValue(windowedValue, outputCoder);
+                        return Utils.encode(windowedValue, outputCoder);
                     }
                 });
     }

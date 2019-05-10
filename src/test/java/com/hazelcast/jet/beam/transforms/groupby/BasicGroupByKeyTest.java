@@ -179,7 +179,6 @@ public class BasicGroupByKeyTest extends AbstractGroupByKeyTest {
     }
 
     @Test
-    @Ignore //todo: what to do with this one?
     public void testGroupByKeyWithBadEqualsHashCode() {
         final int numValues = 10;
         final int numKeys = 5;

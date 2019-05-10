@@ -64,7 +64,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
                 Utils.roundRobinSubList(allShards, context.globalProcessorIndex(), context.totalParallelism());
         this.readers = createReaders(myShards, options);
 
-        Function<UnboundedReader<T>, byte[]> mapFn = (reader) -> Utils.encodeWindowedValue(
+        Function<UnboundedReader<T>, byte[]> mapFn = (reader) -> Utils.encode(
                 WindowedValue.timestampedValueInGlobalWindow(reader.getCurrent(), reader.getCurrentTimestamp()), outputCoder);
 
         if (myShards.size() == 0) {
