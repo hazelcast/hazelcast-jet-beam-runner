@@ -61,8 +61,6 @@ public class TestStreamP extends AbstractProcessor {
 
     @Override
     public boolean complete() {
-        // todo: TestStream says it should cease emitting, but not stop after the items.
-        //   But I don't know how they end the job otherwise...
         return emitFromTraverser(traverser);
     }
 
@@ -96,7 +94,7 @@ public class TestStreamP extends AbstractProcessor {
     public static class SerializableWatermarkEvent implements Serializable {
         private final long timestamp;
 
-        public SerializableWatermarkEvent(long timestamp) {
+        SerializableWatermarkEvent(long timestamp) {
             this.timestamp = timestamp;
         }
 
@@ -109,7 +107,7 @@ public class TestStreamP extends AbstractProcessor {
         private final T value;
         private final Instant timestamp;
 
-        public SerializableTimestampedValue(@Nullable T value, Instant timestamp) {
+        SerializableTimestampedValue(@Nullable T value, Instant timestamp) {
             this.value = value;
             this.timestamp = timestamp;
         }

@@ -17,6 +17,7 @@
 package com.hazelcast.jet.beam.metrics;
 
 import com.hazelcast.jet.IMapJet;
+import com.hazelcast.jet.Util;
 import com.hazelcast.jet.core.Processor;
 import org.apache.beam.runners.core.metrics.DistributionData;
 import org.apache.beam.runners.core.metrics.GaugeData;
@@ -39,7 +40,9 @@ public class JetMetricsContainer implements MetricsContainer {
         return stepName.substring(0, stepName.indexOf('/'));
     }
 
-    public static final String METRICS_ACCUMULATOR_NAME = "metrics"; //todo: should be unique for the current pipeline, I guess
+    public static String getMetricsMapName(long jobId) {
+        return Util.idToString(jobId) + "_METRICS";
+    }
 
     private final String stepName;
 
@@ -51,7 +54,7 @@ public class JetMetricsContainer implements MetricsContainer {
 
     public JetMetricsContainer(String stepName, Processor.Context context) {
         this.stepName = stepName + "/" + context.globalProcessorIndex();
-        this.accumulator = context.jetInstance().getMap(METRICS_ACCUMULATOR_NAME);
+        this.accumulator = context.jetInstance().getMap(getMetricsMapName(context.jobId()));
     }
 
     @Override

@@ -43,15 +43,18 @@ public class JetPipelineResult implements PipelineResult {
     private static final Logger LOG = LoggerFactory.getLogger(JetRunner.class);
 
     private final Job job;
-    private final JetMetricResults metricResults = new JetMetricResults();
+    private final JetMetricResults metricResults;
     private volatile State terminalState;
 
     JetPipelineResult(@Nonnull Job job, @Nonnull IMapJet<String, MetricUpdates> metricsAccumulator) {
         this.job = Objects.requireNonNull(job);
         // save the terminal state when the job completes because the `job` instance will become invalid afterwards
-        job.getFuture().whenComplete((r, f) -> terminalState = f != null ? State.FAILED : State.DONE);
+        metricResults = new JetMetricResults(metricsAccumulator);
+    }
 
-        Objects.requireNonNull(metricsAccumulator).addEntryListener(metricResults, true);
+    void freeze(Throwable throwable) {
+        metricResults.freeze();
+        terminalState = throwable != null ? State.FAILED : State.DONE;
     }
 
     @Override

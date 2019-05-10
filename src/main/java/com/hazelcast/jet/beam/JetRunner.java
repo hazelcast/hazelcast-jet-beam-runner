@@ -21,6 +21,7 @@ import com.hazelcast.jet.IMapJet;
 import com.hazelcast.jet.Jet;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
+import com.hazelcast.jet.beam.metrics.JetMetricsContainer;
 import com.hazelcast.jet.core.DAG;
 import org.apache.beam.runners.core.construction.UnconsumedReads;
 import org.apache.beam.runners.core.metrics.MetricUpdates;
@@ -36,8 +37,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
-
-import static com.hazelcast.jet.beam.metrics.JetMetricsContainer.METRICS_ACCUMULATOR_NAME;
 
 public class JetRunner extends PipelineRunner<PipelineResult> {
 
@@ -126,12 +125,18 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         // todo: we use single client for each job, it might be better to have a shared client with refcount
         JetInstance jet = getJetInstance(options);
 
-        IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(METRICS_ACCUMULATOR_NAME);
-        metricsAccumulator.clear();
         Job job = jet.newJob(dag);
-        job.getFuture().whenComplete((r, f) -> jet.shutdown());
+        IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(JetMetricsContainer.getMetricsMapName(job.getId()));
+        JetPipelineResult pipelineResult = new JetPipelineResult(job, metricsAccumulator);
+        job.getFuture().whenComplete(
+                (r, f) -> {
+                    pipelineResult.freeze(f);
+                    metricsAccumulator.destroy();
+                    jet.shutdown();
+                }
+        );
 
-        return new JetPipelineResult(job, metricsAccumulator);
+        return pipelineResult;
     }
 
     private JetInstance getJetInstance(JetPipelineOptions options) {
