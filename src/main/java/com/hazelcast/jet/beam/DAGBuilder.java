@@ -27,6 +27,7 @@ import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.util.CoderUtils;
 import org.apache.beam.sdk.util.WindowedValue;
 import org.apache.beam.sdk.values.KV;
+import org.apache.beam.sdk.values.PCollectionView;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,6 +37,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public class DAGBuilder {
 
@@ -46,6 +48,7 @@ public class DAGBuilder {
     private final Map<String, List<Vertex>> edgeEndPoints = new HashMap<>();
     private final Map<String, Coder> edgeCoders = new HashMap<>();
     private final Map<String, String> pCollsOfEdges = new HashMap<>();
+    private final Set<String> sideInputCollections = new HashSet<>();
 
     private final List<WiringListener> listeners = new ArrayList<>();
 
@@ -91,6 +94,10 @@ public class DAGBuilder {
                 .add(vertex);
     }
 
+    void registerSideInput(PCollectionView<?> view) {
+        sideInputCollections.add(view.getTagInternal().getId());
+    }
+
     Vertex addVertex(String id, ProcessorMetaSupplier processorMetaSupplier) {
         return dag.newVertex(id, processorMetaSupplier);
     }
@@ -127,7 +134,7 @@ public class DAGBuilder {
                 if (edgeCoder == null) throw new RuntimeException("Oops!");
 
                 List<Vertex> destinationVertices = edgeEndPoints.getOrDefault(edgeId, Collections.emptyList());
-                boolean sideInputEdge = edgeId.contains("PCollectionView"); //todo: this is a hack!
+                boolean sideInputEdge = sideInputCollections.contains(pCollId);
                 for (Vertex destinationVertex : destinationVertices) {
                     addEdge(sourceVertex, destinationVertex, edgeCoder, edgeId, pCollId, sideInputEdge);
                 }

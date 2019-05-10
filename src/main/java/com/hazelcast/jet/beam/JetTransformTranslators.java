@@ -282,6 +282,7 @@ class JetTransformTranslators {
             dagBuilder.registerEdgeEndPoint(Utils.getTupleTagId(input), vertex);
 
             String viewTag = Utils.getTupleTagId(view);
+            dagBuilder.registerSideInput(view);
             dagBuilder.registerCollectionOfEdge(viewTag, view.getTagInternal().getId());
             dagBuilder.registerEdgeStartPoint(viewTag, vertex, outputCoder);
 
