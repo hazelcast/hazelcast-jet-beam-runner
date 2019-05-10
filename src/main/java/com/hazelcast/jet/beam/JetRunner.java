@@ -123,6 +123,7 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
     }
 
     private JetPipelineResult run(DAG dag) {
+        // todo: we use single client for each job, it might be better to have a shared client with refcount
         JetInstance jet = getJetInstance(options);
 
         IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(METRICS_ACCUMULATOR_NAME);

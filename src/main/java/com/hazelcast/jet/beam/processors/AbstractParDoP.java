@@ -131,7 +131,8 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
         this.outbox = outbox;
         metricsContainer = new JetMetricsContainer(stepId, context);
-        MetricsEnvironment.setCurrentContainer(metricsContainer); //todo: this is correct only as long as the processor is non-cooperative
+        MetricsEnvironment.setCurrentContainer(metricsContainer);
+        assert !isCooperative(); //todo: previous line is correct only if the processor is non-cooperative
 
         doFnInvoker = DoFnInvokers.invokerFor(doFn);
         doFnInvoker.invokeSetup();

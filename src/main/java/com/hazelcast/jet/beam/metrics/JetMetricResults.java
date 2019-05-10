@@ -41,7 +41,6 @@ import java.util.Map;
 
 public class JetMetricResults extends MetricResults implements EntryAddedListener<String, MetricUpdates>, MapClearedListener {
 
-
     private final Counters counters = new Counters();
     private final Distributions distributions = new Distributions();
     private final Gauges gauges = new Gauges();

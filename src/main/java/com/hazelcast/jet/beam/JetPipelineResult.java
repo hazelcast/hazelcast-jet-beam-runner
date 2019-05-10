@@ -51,8 +51,7 @@ public class JetPipelineResult implements PipelineResult {
         // save the terminal state when the job completes because the `job` instance will become invalid afterwards
         job.getFuture().whenComplete((r, f) -> terminalState = f != null ? State.FAILED : State.DONE);
 
-        IMapJet<String, MetricUpdates> metricsAccumulator1 = Objects.requireNonNull(metricsAccumulator);
-        metricsAccumulator1.addEntryListener(metricResults, true);
+        Objects.requireNonNull(metricsAccumulator).addEntryListener(metricResults, true);
     }
 
     @Override
@@ -111,8 +110,6 @@ public class JetPipelineResult implements PipelineResult {
             return State.DONE;
         } catch (InterruptedException | TimeoutException e) {
             return getState(); // job should be RUNNING or STOPPED
-        } catch (CancellationException e) {
-            throw e;
         } catch (ExecutionException e) {
             throw new CompletionException(e.getCause());
         }
