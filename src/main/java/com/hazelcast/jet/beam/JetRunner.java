@@ -23,6 +23,7 @@ import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.beam.metrics.JetMetricsContainer;
 import com.hazelcast.jet.core.DAG;
+import com.hazelcast.jet.server.JetBootstrap;
 import org.apache.beam.runners.core.construction.UnconsumedReads;
 import org.apache.beam.runners.core.metrics.MetricUpdates;
 import org.apache.beam.sdk.Pipeline;
@@ -43,7 +44,11 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
     private static final Logger LOG = LoggerFactory.getLogger(JetRunner.class);
 
     public static JetRunner fromOptions(PipelineOptions options) {
-        return fromOptions(options, Jet::newJetClient);
+        return fromOptions(options,
+                options.as(JetPipelineOptions.class).getJetStartOwnCluster() ?
+                        Jet::newJetClient :
+                        config -> JetBootstrap.getInstance()
+        );
     }
 
     public static JetRunner fromOptions(PipelineOptions options, Function<ClientConfig, JetInstance> jetClientSupplier) {

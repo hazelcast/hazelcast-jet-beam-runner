@@ -81,7 +81,7 @@
         <!-- https://mvnrepository.com/artifact/com.hazelcast.jet/hazelcast-jet-core -->
         <dependency>
             <groupId>com.hazelcast.jet</groupId>
-            <artifactId>hazelcast-jet-core</artifactId>
+            <artifactId>hazelcast-jet</artifactId>
             <version>${hazelcast.jet.version}</version>
         </dependency>
 
