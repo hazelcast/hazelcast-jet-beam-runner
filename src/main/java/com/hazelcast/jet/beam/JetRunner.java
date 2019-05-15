@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 /** Jet specific implementation of Beam's {@link PipelineRunner}. */
@@ -126,8 +127,8 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
         Job job = jet.newJob(dag);
         IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(JetMetricsContainer.getMetricsMapName(job.getId()));
         JetPipelineResult pipelineResult = new JetPipelineResult(job, metricsAccumulator);
-        job.getFuture()
-                .whenComplete(
+        CompletableFuture<Void> completionFuture = job.getFuture()
+                .whenCompleteAsync(
                         (r, f) -> {
                             pipelineResult.freeze(f);
                             metricsAccumulator.destroy();
@@ -139,6 +140,7 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
                             }
                         }
                 );
+        pipelineResult.setCompletionFuture(completionFuture);
 
         return pipelineResult;
     }

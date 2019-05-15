@@ -47,10 +47,16 @@ public class JetPipelineResult implements PipelineResult {
     private final JetMetricResults metricResults;
     private volatile State terminalState;
 
+    private CompletableFuture<Void> completionFuture;
+
     JetPipelineResult(@Nonnull Job job, @Nonnull IMapJet<String, MetricUpdates> metricsAccumulator) {
         this.job = Objects.requireNonNull(job);
         // save the terminal state when the job completes because the `job` instance will become invalid afterwards
         metricResults = new JetMetricResults(metricsAccumulator);
+    }
+
+    void setCompletionFuture(CompletableFuture<Void> completionFuture) {
+        this.completionFuture = completionFuture;
     }
 
     void freeze(Throwable throwable) {
@@ -103,14 +109,9 @@ public class JetPipelineResult implements PipelineResult {
         if (terminalState != null) {
             return terminalState;
         }
-        CompletableFuture<Void> future;
+
         try {
-            future = job.getFuture();
-        } catch (Exception e) {
-            throw new JetException("Failed to join the job: " + e, e);
-        }
-        try {
-            future.get(duration.getMillis(), TimeUnit.MILLISECONDS);
+            completionFuture.get(duration.getMillis(), TimeUnit.MILLISECONDS);
             return State.DONE;
         } catch (InterruptedException | TimeoutException e) {
             return getState(); // job should be RUNNING or STOPPED
