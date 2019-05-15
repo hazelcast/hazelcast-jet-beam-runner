@@ -17,6 +17,7 @@
 package com.hazelcast.jet.beam;
 
 import com.hazelcast.jet.Traverser;
+import com.hazelcast.jet.Traversers;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;
@@ -30,19 +31,21 @@ import org.joda.time.Instant;
 import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import static com.hazelcast.jet.Traversers.traverseIterable;
-import static java.util.stream.Collectors.toList;
-
+/**
+ * Jet {@link com.hazelcast.jet.core.Processor} implementation for Beam's {@link TestStream}
+ * transform.
+ */
 public class TestStreamP extends AbstractProcessor {
 
     private final Traverser traverser;
 
     @SuppressWarnings("unchecked")
     private TestStreamP(List events, Coder outputCoder) {
-        traverser = traverseIterable(events)
+        traverser = Traversers.traverseIterable(events)
                 .map(event -> {
                     if (event instanceof SerializableWatermarkEvent) {
                         long ts = ((SerializableWatermarkEvent) event).getTimestamp();
@@ -88,7 +91,7 @@ public class TestStreamP extends AbstractProcessor {
                         throw new UnsupportedOperationException("Event type not supported in TestStream: " + e.getClass() + ", event: " + e);
                     }
                 })
-                .collect(toList());
+                .collect(Collectors.toList());
     }
 
     public static class SerializableWatermarkEvent implements Serializable {

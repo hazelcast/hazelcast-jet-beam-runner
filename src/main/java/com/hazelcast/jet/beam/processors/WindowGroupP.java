@@ -23,6 +23,7 @@ import com.hazelcast.jet.core.AppendableTraverser;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.function.SupplierEx;
+import com.hazelcast.jet.impl.util.ExceptionUtil;
 import org.apache.beam.runners.core.InMemoryStateInternals;
 import org.apache.beam.runners.core.InMemoryTimerInternals;
 import org.apache.beam.runners.core.LateDataUtils;
@@ -59,10 +60,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
-import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
-import static java.util.stream.Collectors.toList;
-
+/**
+ * Jet {@link com.hazelcast.jet.core.Processor} implementation for Beam's GroupByKeyOnly +
+ * GroupAlsoByWindow primitives.
+ *
+ * @param <K> key type of {@link KV} values from the output of this primitive
+ * @param <V> type of elements being windowed
+ */
 public class WindowGroupP<K, V> extends AbstractProcessor {
 
     private static final int PROCESSING_TIME_MIN_INCREMENT = 100;
@@ -249,7 +255,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                 advanceOutputWatermark(hold);
                 reduceFnRunner.persist();
             } catch (Exception e) {
-                throw rethrow(e);
+                throw ExceptionUtil.rethrow(e);
             }
         }
 
@@ -258,7 +264,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                 timerInternals.advanceProcessingTime(now);
                 reduceFnRunner.persist();
             } catch (Exception e) {
-                throw rethrow(e);
+                throw ExceptionUtil.rethrow(e);
             }
         }
 
@@ -289,7 +295,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
                     reduceFnRunner.processElements(Collections.singletonList(windowedValue)); //todo: try to process more than one element at a time...
                     reduceFnRunner.persist();
                 } catch (Exception e) {
-                    throw rethrow(e);
+                    throw ExceptionUtil.rethrow(e);
                 }
             }
         }
@@ -307,7 +313,7 @@ public class WindowGroupP<K, V> extends AbstractProcessor {
             // if there are expired items, return a filtered collection
             return windows.stream()
                    .filter(window -> !isExpiredWindow(window))
-                   .collect(toList());
+                   .collect(Collectors.toList());
         }
 
         private boolean isExpiredWindow(BoundedWindow window) {

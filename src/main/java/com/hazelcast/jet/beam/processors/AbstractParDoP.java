@@ -79,10 +79,10 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     private final String stepId;
 
     DoFnRunner<InputT, OutputT> doFnRunner;
+    JetOutputManager outputManager;
 
     private DoFnInvoker<InputT, OutputT> doFnInvoker;
     private SideInputHandler sideInputHandler;
-    JetOutputManager outputManager;
     private JetMetricsContainer metricsContainer;
     private SimpleInbox bufferedItems;
     private Set<Integer> completedSideInputs = new HashSet<>();
@@ -455,7 +455,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     private static class SimpleInbox implements Inbox {
         private Deque<Object> items = new ArrayDeque<>();
 
-        public void add(Object item) {
+        void add(Object item) {
             items.add(item);
         }
 

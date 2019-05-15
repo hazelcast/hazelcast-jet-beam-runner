@@ -34,6 +34,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Jet specific implementation of {@link MetricsContainer}. */
 public class JetMetricsContainer implements MetricsContainer {
 
     public static String ownerIdFromStepName(String stepName) {

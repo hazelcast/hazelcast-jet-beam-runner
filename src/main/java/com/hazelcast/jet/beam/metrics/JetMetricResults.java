@@ -37,6 +37,7 @@ import javax.annotation.concurrent.GuardedBy;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Jet specific {@link MetricResults}. */
 public class JetMetricResults extends MetricResults {
 
     @GuardedBy("this")
@@ -71,7 +72,7 @@ public class JetMetricResults extends MetricResults {
         );
     }
 
-    private void updateLocalMetrics(IMapJet<String, MetricUpdates> metricsAccumulator) {
+    private synchronized void updateLocalMetrics(IMapJet<String, MetricUpdates> metricsAccumulator) {
         counters.clear();
         distributions.clear();
         gauges.clear();

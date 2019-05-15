@@ -42,6 +42,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Slightly altered version of the Jet based runner, used in unit-tests. */
 public class TestJetRunner extends PipelineRunner<PipelineResult> {
 
     /**
@@ -78,9 +79,9 @@ public class TestJetRunner extends PipelineRunner<PipelineResult> {
         try {
             PipelineResult result = delegate.run(pipeline);
             if (result instanceof FailedRunningPipelineResults) {
-                RuntimeException failureCause = ((FailedRunningPipelineResults) result).getCause();
-                throw failureCause;
+                throw ((FailedRunningPipelineResults) result).getCause();
             }
+            result.waitUntilFinish();
             return result;
         } finally {
             killMemberInstances(instances, factory);

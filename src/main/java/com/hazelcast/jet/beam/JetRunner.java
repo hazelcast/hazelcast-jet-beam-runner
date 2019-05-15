@@ -35,10 +35,13 @@ import org.apache.beam.sdk.transforms.PTransform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
+/** Jet specific implementation of Beam's {@link PipelineRunner}. */
 public class JetRunner extends PipelineRunner<PipelineResult> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JetRunner.class);
@@ -68,17 +71,13 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
 
     @Override
     public PipelineResult run(Pipeline pipeline) {
-        Boolean startOwnCluster = options.getJetStartOwnCluster();
-        if (startOwnCluster) {
-            JetInstance jet1 = Jet.newJetInstance();
-            JetInstance jet2 = Jet.newJetInstance();
-        }
         try {
-            return runInternal(pipeline);
-        } finally {
-            if (startOwnCluster) {
-                Jet.shutdownAll();
-            }
+            normalize(pipeline);
+            DAG dag = translate(pipeline);
+            return run(dag);
+        } catch (UnsupportedOperationException uoe) {
+            LOG.error("Failed running pipeline!", uoe);
+            return new FailedRunningPipelineResults(uoe);
         }
     }
 
@@ -110,36 +109,36 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
     }
 
     private DAG translate(Pipeline pipeline) {
-        /*PrintGraphVisitor printVisitor = new PrintGraphVisitor();
-        pipeline.traverseTopologically(printVisitor);
-        System.out.println("Beam pipeline:" + printVisitor.print()); //todo: remove*/
-
-        /*PrintFullGraphVisitor printFullVisitor = new PrintFullGraphVisitor();
-        pipeline.traverseTopologically(printFullVisitor);
-        System.out.println("Beam pipeline:" + printFullVisitor.print());*/ //todo: remove
-
-        //Set<ExecutableStage> fusedStages = GreedyPipelineFuser.fuse(PipelineTranslation.toProto(pipeline)).getFusedStages();
-        //System.out.println("Pipeline fused into " + fusedStages.size() + " stages"); //todo: remove
-
         JetGraphVisitor graphVisitor = new JetGraphVisitor(options, translatorProvider);
         pipeline.traverseTopologically(graphVisitor);
         return graphVisitor.getDAG();
     }
 
     private JetPipelineResult run(DAG dag) {
-        // todo: we use single client for each job, it might be better to have a shared client with refcount
-        JetInstance jet = getJetInstance(options);
+        Boolean startOwnCluster = options.getJetStartOwnCluster();
+        if (startOwnCluster) {
+            Collection<JetInstance> jetInstances = Arrays.asList(Jet.newJetInstance(), Jet.newJetInstance());
+            LOG.info("Started " + jetInstances.size() + " Jet cluster members");
+        }
+
+        JetInstance jet = getJetInstance(options); // todo: we use single client for each job, it might be better to have a shared client with refcount
 
         Job job = jet.newJob(dag);
         IMapJet<String, MetricUpdates> metricsAccumulator = jet.getMap(JetMetricsContainer.getMetricsMapName(job.getId()));
         JetPipelineResult pipelineResult = new JetPipelineResult(job, metricsAccumulator);
-        job.getFuture().whenComplete(
-                (r, f) -> {
-                    pipelineResult.freeze(f);
-                    metricsAccumulator.destroy();
-                    jet.shutdown();
-                }
-        );
+        job.getFuture()
+                .whenComplete(
+                        (r, f) -> {
+                            pipelineResult.freeze(f);
+                            metricsAccumulator.destroy();
+                            jet.shutdown();
+
+                            if (startOwnCluster) {
+                                Jet.shutdownAll();
+                                LOG.info("Stopped all Jet cluster members");
+                            }
+                        }
+                );
 
         return pipelineResult;
     }
@@ -153,16 +152,22 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
     }
 
     private static List<PTransformOverride> getDefaultOverrides() {
-//        return Collections.singletonList(JavaReadViaImpulse.boundedOverride()); //todo: needed once we start using GreedyPipelineFuser
+        //return Collections.singletonList(JavaReadViaImpulse.boundedOverride()); //todo: needed once we start using GreedyPipelineFuser
         return Collections.emptyList();
     }
 
     private static JetPipelineOptions validate(JetPipelineOptions options) {
-        if (options.getJetGroupName() == null) throw new IllegalArgumentException("Jet group name not set in options");
+        if (options.getJetGroupName() == null) {
+            throw new IllegalArgumentException("Jet group name not set in options");
+        }
 
         Integer localParallelism = options.getJetLocalParallelism();
-        if (localParallelism == null) throw new IllegalArgumentException("Jet node local parallelism must be specified");
-        if (localParallelism != -1 && localParallelism < 1) throw new IllegalArgumentException("Jet node local parallelism must be >1 or -1");
+        if (localParallelism == null) {
+            throw new IllegalArgumentException("Jet node local parallelism must be specified");
+        }
+        if (localParallelism != -1 && localParallelism < 1) {
+            throw new IllegalArgumentException("Jet node local parallelism must be >1 or -1");
+        }
 
         return options;
     }

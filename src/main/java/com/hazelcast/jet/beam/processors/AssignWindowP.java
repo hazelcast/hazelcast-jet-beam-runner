@@ -32,19 +32,24 @@ import org.joda.time.Instant;
 import javax.annotation.Nonnull;
 import java.util.Collection;
 
-public class AssignWindowP<InputT> extends AbstractProcessor {
+/**
+ * /** * Jet {@link com.hazelcast.jet.core.Processor} implementation for Beam's Windowing primitive.
+ *
+ * @param <T> type of element being windowed
+ */
+public class AssignWindowP<T> extends AbstractProcessor {
 
-    @SuppressWarnings("FieldCanBeLocal")
+    @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final String ownerId; //do not remove, useful for debugging
 
     private final ResettableSingletonTraverser<byte[]> traverser = new ResettableSingletonTraverser<>();
     private final FlatMapper<byte[], byte[]> flatMapper;
-    private final WindowAssignContext<InputT> windowAssignContext;
+    private final WindowAssignContext<T> windowAssignContext;
 
     private AssignWindowP(
             Coder inputCoder,
             Coder outputCoder,
-            WindowingStrategy<InputT, BoundedWindow> windowingStrategy,
+            WindowingStrategy<T, BoundedWindow> windowingStrategy,
             String ownerId
     ) {
         this.ownerId = ownerId;
@@ -53,14 +58,14 @@ public class AssignWindowP<InputT> extends AbstractProcessor {
 
         flatMapper = flatMapper(item -> {
             Collection<BoundedWindow> windows;
-            WindowedValue<InputT> inputValue = Utils.decodeWindowedValue(item, inputCoder);
+            WindowedValue<T> inputValue = Utils.decodeWindowedValue(item, inputCoder);
             windowAssignContext.setValue(inputValue);
             try {
                 windows = windowingStrategy.getWindowFn().assignWindows(windowAssignContext);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            WindowedValue<InputT> outputValue = WindowedValue.of(inputValue.getValue(), inputValue.getTimestamp(), windows, inputValue.getPane());
+            WindowedValue<T> outputValue = WindowedValue.of(inputValue.getValue(), inputValue.getTimestamp(), windows, inputValue.getPane());
             traverser.accept(Utils.encode(outputValue, outputCoder));
             return traverser;
         });

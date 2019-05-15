@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+/** Jet specific implementation of {@link PipelineResult}. */
 public class JetPipelineResult implements PipelineResult {
 
     private static final Logger LOG = LoggerFactory.getLogger(JetRunner.class);

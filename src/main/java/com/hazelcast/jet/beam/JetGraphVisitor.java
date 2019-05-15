@@ -40,7 +40,9 @@ class JetGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
 
     @Override
     public CompositeBehavior enterCompositeTransform(TransformHierarchy.Node node) {
-        if (finalized) throw new IllegalStateException("Attempting to traverse an already finalized pipeline!");
+        if (finalized) {
+            throw new IllegalStateException("Attempting to traverse an already finalized pipeline!");
+        }
 
         PTransform<?, ?> transform = node.getTransform();
         if (transform != null) {
@@ -55,8 +57,12 @@ class JetGraphVisitor extends Pipeline.PipelineVisitor.Defaults {
 
     @Override
     public void leaveCompositeTransform(TransformHierarchy.Node node) {
-        if (finalized) throw new IllegalStateException("Attempting to traverse an already finalized pipeline!");
-        if (node.isRootNode()) finalized = true;
+        if (finalized) {
+            throw new IllegalStateException("Attempting to traverse an already finalized pipeline!");
+        }
+        if (node.isRootNode()) {
+            finalized = true;
+        }
     }
 
     @Override

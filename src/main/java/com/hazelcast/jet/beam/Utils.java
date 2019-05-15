@@ -57,6 +57,7 @@ import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 import static java.util.stream.Collectors.toList;
 import static org.apache.beam.vendor.guava.v20_0.com.google.common.base.Preconditions.checkState;
 
+/** Various common methods used by the Jet based runner. */
 public class Utils {
 
     public static String getTupleTagId(PValue value) {
@@ -84,11 +85,11 @@ public class Utils {
         return node.getTransform() != null ? node.getTransform().getAdditionalInputs() : null;
     }
 
-    static <T extends PValue> T getInput(AppliedPTransform<?, ?, ?> appliedTransform) {
+    static PValue getInput(AppliedPTransform<?, ?, ?> appliedTransform) {
         if (appliedTransform.getTransform() == null) {
             return null;
         }
-        return (T) Iterables.getOnlyElement(TransformInputs.nonAdditionalInputs(appliedTransform));
+        return Iterables.getOnlyElement(TransformInputs.nonAdditionalInputs(appliedTransform));
     }
 
     static Map<TupleTag<?>, PValue> getOutputs(AppliedPTransform<?, ?, ?> appliedTransform) {
@@ -183,7 +184,9 @@ public class Utils {
 
         Map<TupleTag<?>, PValue> outputs = getOutputs(appliedTransform);
 
-        if (outputs == null || outputs.isEmpty()) throw new IllegalStateException("No outputs defined.");
+        if (outputs == null || outputs.isEmpty()) {
+            throw new IllegalStateException("No outputs defined.");
+        }
 
         PValue taggedValue = outputs.values().iterator().next();
         checkState(
@@ -208,7 +211,7 @@ public class Utils {
      * </pre>
      */
     @Nonnull
-    public static <E> List<E> roundRobinSubList(@Nonnull List<E> list, int index, int count) {
+    public static <T> List<T> roundRobinSubList(@Nonnull List<T> list, int index, int count) {
         if (index < 0 || index >= count) {
             throw new IllegalArgumentException("index=" + index + ", count=" + count);
         }

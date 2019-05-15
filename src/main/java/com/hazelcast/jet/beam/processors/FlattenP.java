@@ -29,6 +29,7 @@ import javax.annotation.Nonnull;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Jet {@link com.hazelcast.jet.core.Processor} implementation for Beam's Flatten primitive. */
 public class FlattenP extends AbstractProcessor {
 
     private final Map<Integer, Coder> inputOrdinalCoders;

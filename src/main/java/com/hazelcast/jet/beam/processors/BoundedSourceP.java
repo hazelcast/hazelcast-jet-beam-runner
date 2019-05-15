@@ -17,11 +17,13 @@
 package com.hazelcast.jet.beam.processors;
 
 import com.hazelcast.jet.Traverser;
+import com.hazelcast.jet.Traversers;
 import com.hazelcast.jet.beam.Utils;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;
+import com.hazelcast.jet.impl.util.ExceptionUtil;
 import com.hazelcast.nio.Address;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
@@ -36,10 +38,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 
-import static com.hazelcast.jet.Traversers.traverseIterable;
-import static com.hazelcast.jet.beam.Utils.roundRobinSubList;
-import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
-
+/**
+ * Jet {@link com.hazelcast.jet.core.Processor} implementation for reading from a bounded Beam
+ * source.
+ */
 public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
 
     private final Traverser<BoundedSource<T>> shardsTraverser;
@@ -51,7 +53,7 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
     private BoundedSource.BoundedReader currentReader;
 
     BoundedSourceP(List<BoundedSource<T>> shards, PipelineOptions options, Coder outputCoder, String ownerId) {
-        this.shardsTraverser = traverseIterable(shards);
+        this.shardsTraverser = Traversers.traverseIterable(shards);
         this.options = options;
         this.outputCoder = outputCoder;
         this.ownerId = ownerId;
@@ -75,7 +77,7 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
             }
             return outputCoder == null ? res : Utils.encode(res, outputCoder); //todo: this is not nice, have done this only as a quick fix for BoundedSourcePTest
         } catch (IOException e) {
-            throw rethrow(e);
+            throw ExceptionUtil.rethrow(e);
         }
     }
 
@@ -158,7 +160,7 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
         @Override
         public Function<? super Address, ? extends ProcessorSupplier> get(@Nonnull List<Address> addresses) {
             return address -> new BoundedSourceProcessorSupplier(
-                    roundRobinSubList(shards, addresses.indexOf(address), addresses.size()), options, outputCoder, ownerId);
+                    Utils.roundRobinSubList(shards, addresses.indexOf(address), addresses.size()), options, outputCoder, ownerId);
         }
     }
 
@@ -192,7 +194,7 @@ public class BoundedSourceP<T> extends AbstractProcessor implements Traverser {
             int indexBase = context.memberIndex() * context.localParallelism();
             List<Processor> res = new ArrayList<>(count);
             for (int i = 0; i < count; i++, indexBase++) {
-                res.add(new BoundedSourceP<>(roundRobinSubList(shards, i, count), options.get(), outputCoder, ownerId));
+                res.add(new BoundedSourceP<>(Utils.roundRobinSubList(shards, i, count), options.get(), outputCoder, ownerId));
             }
             return res;
         }

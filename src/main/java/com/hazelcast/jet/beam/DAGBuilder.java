@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+/** Utility class for wiring up Jet DAGs based on Beam pipelines. */
 public class DAGBuilder {
 
     private final DAG dag = new DAG();
@@ -75,7 +76,9 @@ public class DAGBuilder {
 
     void registerCollectionOfEdge(String edgeId, String pCollId) {
         String prevPCollId = pCollsOfEdges.put(edgeId, pCollId);
-        if (prevPCollId != null) throw new RuntimeException("Oops!");
+        if (prevPCollId != null) {
+            throw new RuntimeException("Oops!");
+        }
     }
 
     void registerEdgeStartPoint(String edgeId, Vertex vertex, Coder coder) {
@@ -84,10 +87,14 @@ public class DAGBuilder {
         Objects.requireNonNull(coder);
 
         Vertex prevVertex = edgeStartPoints.put(edgeId, vertex);
-        if (prevVertex != null) throw new RuntimeException("Oops!");
+        if (prevVertex != null) {
+            throw new RuntimeException("Oops!");
+        }
 
         Coder prevCoder = edgeCoders.put(edgeId, coder);
-        if (prevCoder != null) throw new RuntimeException("Oops!");
+        if (prevCoder != null) {
+            throw new RuntimeException("Oops!");
+        }
     }
 
     void registerEdgeEndPoint(String edgeId, Vertex vertex) {
@@ -115,6 +122,32 @@ public class DAGBuilder {
         new WiringInstaller().wireUp();
     }
 
+    /**
+     * Listener that can be registered with a {@link DAGBuilder} in order to be notified when edges
+     * are being registered.
+     */
+    public interface WiringListener {
+
+        void isOutboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId);
+
+        void isInboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId);
+    }
+
+    private static class PartitionedKeyExtractor<K, V> implements FunctionEx<byte[], Object> {
+        private final WindowedValue.WindowedValueCoder<KV<K, V>> coder;
+
+        PartitionedKeyExtractor(Coder coder) {
+            this.coder = (WindowedValue.WindowedValueCoder<KV<K, V>>) coder;
+        }
+
+        @Override
+        public Object applyEx(byte[] b) throws Exception {
+            WindowedValue<KV<K, V>> windowedValue = CoderUtils.decodeFromByteArray(coder, b); //todo: decoding twice....
+            KvCoder<K, V> kvCoder = (KvCoder<K, V>) coder.getValueCoder();
+            return CoderUtils.encodeToByteArray(kvCoder.getKeyCoder(), windowedValue.getValue().getKey());
+        }
+    }
+
     private class WiringInstaller {
 
         private final Map<Vertex, Integer> inboundOrdinals = new HashMap<>();
@@ -127,13 +160,19 @@ public class DAGBuilder {
 
             for (String edgeId : edgeIds) {
                 String pCollId = pCollsOfEdges.get(edgeId);
-                if (pCollId == null) throw new RuntimeException("Oops!");
+                if (pCollId == null) {
+                    throw new RuntimeException("Oops!");
+                }
 
                 Vertex sourceVertex = edgeStartPoints.get(edgeId);
-                if (sourceVertex == null) throw new RuntimeException("Oops!");
+                if (sourceVertex == null) {
+                    throw new RuntimeException("Oops!");
+                }
 
                 Coder edgeCoder = edgeCoders.get(edgeId);
-                if (edgeCoder == null) throw new RuntimeException("Oops!");
+                if (edgeCoder == null) {
+                    throw new RuntimeException("Oops!");
+                }
 
                 List<Vertex> destinationVertices = edgeEndPoints.getOrDefault(edgeId, Collections.emptyList());
                 boolean sideInputEdge = sideInputCollections.contains(pCollId);
@@ -175,27 +214,5 @@ public class DAGBuilder {
             return nextOrdinal;
         }
 
-    }
-
-    public interface WiringListener {
-
-        void isOutboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId);
-
-        void isInboundEdgeOfVertex(Edge edge, String edgeId, String pCollId, String vertexId);
-    }
-
-    private static class PartitionedKeyExtractor<K, V> implements FunctionEx<byte[], Object> {
-        private final WindowedValueCoder<KV<K, V>> coder;
-
-        PartitionedKeyExtractor(Coder coder) {
-            this.coder = (WindowedValueCoder<KV<K, V>>) coder;
-        }
-
-        @Override
-        public Object applyEx(byte[] b) throws Exception {
-            WindowedValue<KV<K, V>> windowedValue = CoderUtils.decodeFromByteArray(coder, b); //todo: decoding twice....
-            KvCoder<K, V> kvCoder = (KvCoder<K, V>) coder.getValueCoder();
-            return CoderUtils.encodeToByteArray(kvCoder.getKeyCoder(), windowedValue.getValue().getKey());
-        }
     }
 }

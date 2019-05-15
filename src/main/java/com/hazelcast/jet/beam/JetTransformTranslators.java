@@ -168,7 +168,7 @@ class JetTransformTranslators {
             String vertexId = dagBuilder.newVertexId(transformName) + (usesStateOrTimers ? " - STATEFUL" : "");
             SerializablePipelineOptions pipelineOptions = context.getOptions();
             Coder inputValueCoder = ((PCollection) Utils.getInput(appliedTransform)).getCoder();
-            Coder inputCoder = Utils.getCoder(Utils.getInput(appliedTransform));
+            Coder inputCoder = Utils.getCoder((PCollection) Utils.getInput(appliedTransform));
             List<PCollectionView<?>> sideInputs = Utils.getSideInputs(appliedTransform);
             Map<? extends PCollectionView<?>, Coder> sideInputCoders = sideInputs.stream()
                     .collect(Collectors.toMap(si -> si, si -> Utils.getCoder(si.getPCollection())));
@@ -238,7 +238,7 @@ class JetTransformTranslators {
         public Vertex translate(Pipeline pipeline, AppliedPTransform<?, ?, ?> appliedTransform, Node node, JetTranslationContext context) {
             String transformName = appliedTransform.getFullName();
 
-            PCollection<KV<K, InputT>> input = Utils.getInput(appliedTransform);
+            PCollection<KV<K, InputT>> input = (PCollection<KV<K,InputT>>) Utils.getInput(appliedTransform);
             WindowedValueCoder<KV<K, InputT>> inputCoder = Utils.getWindowedValueCoder(input);
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
@@ -272,7 +272,7 @@ class JetTransformTranslators {
             String transformName = appliedTransform.getFullName();
             DAGBuilder dagBuilder = context.getDagBuilder();
             String vertexId = dagBuilder.newVertexId(transformName);
-            PCollection<T> input = Utils.getInput(appliedTransform);
+            PCollection<T> input = (PCollection<T>) Utils.getInput(appliedTransform);
             Coder inputCoder = Utils.getCoder(input);
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             Coder outputCoder = Utils.getCoder((PCollection) output.getValue());
@@ -326,7 +326,7 @@ class JetTransformTranslators {
             WindowingStrategy<T, BoundedWindow> windowingStrategy =
                     (WindowingStrategy<T, BoundedWindow>) ((PCollection) Utils.getOutput(appliedTransform).getValue()).getWindowingStrategy();
 
-            PCollection<WindowedValue> input = Utils.getInput(appliedTransform);
+            PCollection<WindowedValue> input = (PCollection<WindowedValue>) Utils.getInput(appliedTransform);
             Coder inputCoder = Utils.getCoder(input);
             Map.Entry<TupleTag<?>, PValue> output = Utils.getOutput(appliedTransform);
             Coder outputCoder = Utils.getCoder((PCollection) Utils.getOutput(appliedTransform).getValue());

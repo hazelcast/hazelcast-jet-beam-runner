@@ -24,6 +24,7 @@ import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;
 import com.hazelcast.jet.core.Watermark;
+import com.hazelcast.jet.impl.util.ExceptionUtil;
 import com.hazelcast.nio.Address;
 import org.apache.beam.runners.core.construction.SerializablePipelineOptions;
 import org.apache.beam.sdk.coders.Coder;
@@ -38,12 +39,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 
-import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
-
-public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> extends AbstractProcessor {
+/**
+ * Jet {@link com.hazelcast.jet.core.Processor} implementation for reading from an unbounded Beam
+ * source.
+ */
+public class UnboundedSourceP<T, CmT extends UnboundedSource.CheckpointMark> extends AbstractProcessor {
 
     private UnboundedSource.UnboundedReader<T>[] readers;
-    private final List<? extends UnboundedSource<T, CMT>> allShards;
+    private final List<? extends UnboundedSource<T, CmT>> allShards;
     private final PipelineOptions options;
     private final Coder outputCoder;
     @SuppressWarnings({"FieldCanBeLocal", "unused"})
@@ -51,7 +54,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
 
     private Traverser<Object> traverser;
 
-    private UnboundedSourceP(List<? extends UnboundedSource<T, CMT>> allShards, PipelineOptions options, Coder outputCoder, String ownerId) {
+    private UnboundedSourceP(List<? extends UnboundedSource<T, CmT>> allShards, PipelineOptions options, Coder outputCoder, String ownerId) {
         this.allShards = allShards;
         this.options = options;
         this.outputCoder = outputCoder;
@@ -60,7 +63,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
 
     @Override
     protected void init(@Nonnull Processor.Context context) throws IOException {
-        List<? extends UnboundedSource<T, CMT>> myShards =
+        List<? extends UnboundedSource<T, CmT>> myShards =
                 Utils.roundRobinSubList(allShards, context.globalProcessorIndex(), context.totalParallelism());
         this.readers = createReaders(myShards, options);
 
@@ -98,8 +101,8 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
     }
 
     @SuppressWarnings("unchecked")
-    private static <T, CMT extends UnboundedSource.CheckpointMark> UnboundedSource.UnboundedReader<T>[] createReaders(
-            List<? extends UnboundedSource<T, CMT>> shards, PipelineOptions options) {
+    private static <T, CmT extends UnboundedSource.CheckpointMark> UnboundedSource.UnboundedReader<T>[] createReaders(
+            List<? extends UnboundedSource<T, CmT>> shards, PipelineOptions options) {
         return shards.stream()
                 .map(shard -> createReader(options, shard))
                 .toArray(UnboundedSource.UnboundedReader[]::new);
@@ -115,7 +118,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         try {
             return shard.createReader(options, null);
         } catch (IOException e) {
-            throw rethrow(e);
+            throw ExceptionUtil.rethrow(e);
         }
     }
 
@@ -123,7 +126,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         try {
             reader.close();
         } catch (IOException e) {
-            throw rethrow(e);
+            throw ExceptionUtil.rethrow(e);
         }
     }
 
@@ -137,8 +140,8 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         return min;
     }
 
-    public static <T, CMT extends UnboundedSource.CheckpointMark> ProcessorMetaSupplier supplier(
-            UnboundedSource<T, CMT> unboundedSource,
+    public static <T, CmT extends UnboundedSource.CheckpointMark> ProcessorMetaSupplier supplier(
+            UnboundedSource<T, CmT> unboundedSource,
             SerializablePipelineOptions options,
             Coder outputCoder,
             String ownerId
@@ -146,17 +149,17 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
         return new UnboundedSourceProcessorMetaSupplier<>(unboundedSource, options, outputCoder, ownerId);
     }
 
-    private static class UnboundedSourceProcessorMetaSupplier<T, CMT extends UnboundedSource.CheckpointMark> implements ProcessorMetaSupplier {
+    private static class UnboundedSourceProcessorMetaSupplier<T, CmT extends UnboundedSource.CheckpointMark> implements ProcessorMetaSupplier {
 
-        private final UnboundedSource<T, CMT> unboundedSource;
+        private final UnboundedSource<T, CmT> unboundedSource;
         private final SerializablePipelineOptions options;
         private final Coder outputCoder;
         private final String ownerId;
 
-        private List<? extends UnboundedSource<T, CMT>> shards;
+        private List<? extends UnboundedSource<T, CmT>> shards;
 
         private UnboundedSourceProcessorMetaSupplier(
-                UnboundedSource<T, CMT> unboundedSource,
+                UnboundedSource<T, CmT> unboundedSource,
                 SerializablePipelineOptions options,
                 Coder outputCoder,
                 String ownerId
@@ -250,7 +253,7 @@ public class UnboundedSourceP<T, CMT extends UnboundedSource.CheckpointMark> ext
                 //all advances have failed
                 return null;
             } catch (IOException e) {
-                throw rethrow(e);
+                throw ExceptionUtil.rethrow(e);
             }
         }
     }
