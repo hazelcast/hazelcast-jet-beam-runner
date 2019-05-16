@@ -84,13 +84,6 @@ public class JetMetricResults extends MetricResults {
         }
     }
 
-    private static MetricKey normalizeStepName(MetricKey key) {
-        return MetricKey.create(
-                JetMetricsContainer.ownerIdFromStepName(key.stepName()),
-                key.metricName()
-        );
-    }
-
     private static Predicate<Map.Entry<MetricKey, ?>> matchesFilter(final MetricsFilter filter) {
         return entry -> MetricFiltering.matches(filter, entry.getKey());
     }
@@ -132,7 +125,7 @@ public class JetMetricResults extends MetricResults {
 
         void merge(Iterable<MetricUpdate<Long>> updates) {
             for (MetricUpdate<Long> update : updates) {
-                MetricKey key = normalizeStepName(update.getKey());
+                MetricKey key = update.getKey();
                 Long oldValue = counters.getOrDefault(key, 0L);
                 Long updatedValue = oldValue + update.getUpdate();
                 counters.put(key, updatedValue);
@@ -164,7 +157,7 @@ public class JetMetricResults extends MetricResults {
 
         void merge(Iterable<MetricUpdate<DistributionData>> updates) {
             for (MetricUpdate<DistributionData> update : updates) {
-                MetricKey key = normalizeStepName(update.getKey());
+                MetricKey key = update.getKey();
                 DistributionData oldDistribution = distributions.getOrDefault(key, DistributionData.EMPTY);
                 DistributionData updatedDistribution = update.getUpdate().combine(oldDistribution);
                 distributions.put(key, updatedDistribution);
@@ -196,7 +189,7 @@ public class JetMetricResults extends MetricResults {
 
         void merge(Iterable<MetricUpdate<GaugeData>> updates) {
             for (MetricUpdate<GaugeData> update : updates) {
-                MetricKey key = normalizeStepName(update.getKey());
+                MetricKey key = update.getKey();
                 GaugeData oldGauge = gauges.getOrDefault(key, GaugeData.empty());
                 GaugeData updatedGauge = update.getUpdate().combine(oldGauge);
                 gauges.put(key, updatedGauge);

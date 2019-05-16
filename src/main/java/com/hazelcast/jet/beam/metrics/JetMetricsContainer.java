@@ -37,15 +37,12 @@ import java.util.Map;
 /** Jet specific implementation of {@link MetricsContainer}. */
 public class JetMetricsContainer implements MetricsContainer {
 
-    public static String ownerIdFromStepName(String stepName) {
-        return stepName.substring(0, stepName.indexOf('/'));
-    }
-
     public static String getMetricsMapName(long jobId) {
         return Util.idToString(jobId) + "_METRICS";
     }
 
     private final String stepName;
+    private final String metricsKey;
 
     private final Map<MetricName, CounterImpl> counters = new HashMap<>();
     private final Map<MetricName, DistributionImpl> distributions = new HashMap<>();
@@ -53,8 +50,9 @@ public class JetMetricsContainer implements MetricsContainer {
 
     private final IMapJet<String, MetricUpdates> accumulator;
 
-    public JetMetricsContainer(String stepName, Processor.Context context) {
-        this.stepName = stepName + "/" + context.globalProcessorIndex();
+    public JetMetricsContainer(String stepName, String ownerId, Processor.Context context) {
+        this.metricsKey = context.globalProcessorIndex() + "/" + stepName + "/" + ownerId;
+        this.stepName = stepName;
         this.accumulator = context.jetInstance().getMap(getMetricsMapName(context.jobId()));
     }
 
@@ -78,7 +76,7 @@ public class JetMetricsContainer implements MetricsContainer {
         ImmutableList<MetricUpdates.MetricUpdate<DistributionData>> distributions = extractUpdates(this.distributions);
         ImmutableList<MetricUpdates.MetricUpdate<GaugeData>> gauges = extractUpdates(this.gauges);
         MetricUpdates updates = new MetricUpdatesImpl(counters, distributions, gauges);
-        accumulator.put(stepName, updates);
+        accumulator.put(metricsKey, updates);
     }
 
     private <UpdateT, CellT extends AbstractMetric<UpdateT>> ImmutableList<MetricUpdates.MetricUpdate<UpdateT>> extractUpdates(Map<MetricName, CellT> cells) {

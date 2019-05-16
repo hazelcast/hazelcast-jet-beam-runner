@@ -75,7 +75,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     private final Coder<InputT> inputValueCoder;
     private final Map<TupleTag<?>, Coder<?>> outputValueCoders;
     private final Map<Integer, PCollectionView<?>> ordinalToSideInput;
-    private final String ownerId; //do not remove, useful for debugging
+    private final String ownerId;
     private final String stepId;
 
     DoFnRunner<InputT, OutputT> doFnRunner;
@@ -130,7 +130,7 @@ abstract class AbstractParDoP<InputT, OutputT> implements Processor {
     @Override
     public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
         this.outbox = outbox;
-        metricsContainer = new JetMetricsContainer(stepId, context);
+        metricsContainer = new JetMetricsContainer(stepId, ownerId, context);
         MetricsEnvironment.setCurrentContainer(metricsContainer);
         assert !isCooperative(); //todo: previous line is correct only if the processor is non-cooperative
 

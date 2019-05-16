@@ -93,18 +93,6 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
             return translator;
         };
     }
-
-    private PipelineResult runInternal(Pipeline pipeline) {
-        try {
-            normalize(pipeline);
-            DAG dag = translate(pipeline);
-            return run(dag);
-        } catch (UnsupportedOperationException uoe) {
-            LOG.error("Failed running pipeline!", uoe);
-            return new FailedRunningPipelineResults(uoe);
-        }
-    }
-
     private void normalize(Pipeline pipeline) {
         pipeline.replaceAll(getDefaultOverrides());
         UnconsumedReads.ensureAllReadsConsumed(pipeline);
