@@ -35,6 +35,7 @@ import org.apache.beam.sdk.transforms.PTransform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -116,11 +117,7 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
     }
 
     private JetPipelineResult run(DAG dag) {
-        Boolean startOwnCluster = options.getJetStartOwnCluster();
-        if (startOwnCluster) {
-            Collection<JetInstance> jetInstances = Arrays.asList(Jet.newJetInstance(), Jet.newJetInstance());
-            LOG.info("Started " + jetInstances.size() + " Jet cluster members");
-        }
+        startClusterIfNeeded(options);
 
         JetInstance jet = getJetInstance(options); // todo: we use single client for each job, it might be better to have a shared client with refcount
 
@@ -134,15 +131,30 @@ public class JetRunner extends PipelineRunner<PipelineResult> {
                             metricsAccumulator.destroy();
                             jet.shutdown();
 
-                            if (startOwnCluster) {
-                                Jet.shutdownAll();
-                                LOG.info("Stopped all Jet cluster members");
-                            }
+                            stopClusterIfNeeded(options);
                         }
                 );
         pipelineResult.setCompletionFuture(completionFuture);
 
         return pipelineResult;
+    }
+
+    private void startClusterIfNeeded(JetPipelineOptions options) {
+        if (options.getJetStartOwnCluster()) {
+            Collection<JetInstance> jetInstances = new ArrayList<>();
+            Integer noOfMembers = options.getJetClusterMemberCount();
+            for (int i = 0; i < noOfMembers; i++) {
+                jetInstances.add(Jet.newJetInstance());
+            }
+            LOG.info("Started " + jetInstances.size() + " Jet cluster members");
+        }
+    }
+
+    private void stopClusterIfNeeded(JetPipelineOptions options) {
+        if (options.getJetStartOwnCluster()) {
+            Jet.shutdownAll();
+            LOG.info("Stopped all Jet cluster members");
+        }
     }
 
     private JetInstance getJetInstance(JetPipelineOptions options) {
