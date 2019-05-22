@@ -1,7 +1,12 @@
 # Hazelcast Jet Beam Runner
 
+**WARNING: This has been an experimental/development repository, 
+that has been DISCONTINUED. All future work is happening in the 
+[Apache Beam Repository](https://github.com/apache/beam).**
+
 Runner for [Apache Beam](https://github.com/apache/beam) based on [Hazelcast
 Jet](https://github.com/hazelcast/hazelcast-jet).
+
 
 ### Building From Source
 
